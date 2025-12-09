@@ -1,0 +1,6 @@
+@_2GO_EXE_Project.API_HostAddress = http://localhost:5114
+
+GET {{_2GO_EXE_Project.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
