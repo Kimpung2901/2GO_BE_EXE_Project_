@@ -72,6 +72,7 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<ShippingRequest> ShippingRequests { get; set; }
 
+
     public virtual DbSet<SubCategory> SubCategories { get; set; }
 
     public virtual DbSet<SupportTicket> SupportTickets { get; set; }
@@ -89,6 +90,10 @@ public partial class AppDbContext : DbContext
     public virtual DbSet<UserVerification> UserVerifications { get; set; }
 
     public virtual DbSet<Ward> Wards { get; set; }
+
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
+    public virtual DbSet<VerificationCode> VerificationCodes { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -432,6 +437,21 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.PhoneVerified).HasDefaultValue(false);
 
             entity.HasOne(d => d.User).WithMany(p => p.UserVerifications).HasConstraintName("FK_UserVer_Users");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.RefreshTokenId);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+            entity.HasOne(d => d.User).WithMany(p => p.RefreshTokens).HasForeignKey(d => d.UserId).HasConstraintName("FK_RefreshTokens_Users");
+        });
+
+        modelBuilder.Entity<VerificationCode>(entity =>
+        {
+            entity.HasKey(e => e.VerificationCodeId);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Purpose).HasMaxLength(50).IsUnicode(false);
+            entity.HasOne(d => d.User).WithMany(p => p.VerificationCodes).HasForeignKey(d => d.UserId).HasConstraintName("FK_VerificationCodes_Users");
         });
 
         modelBuilder.Entity<Ward>(entity =>

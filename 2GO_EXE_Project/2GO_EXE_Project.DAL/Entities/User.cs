@@ -116,4 +116,10 @@ public partial class User
 
     [InverseProperty("User")]
     public virtual ICollection<UserVerification> UserVerifications { get; set; } = new List<UserVerification>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<VerificationCode> VerificationCodes { get; set; } = new List<VerificationCode>();
 }
