@@ -455,7 +455,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.WardId).HasName("PK__Wards__C6BD9BCAC40737D0");
 
-            entity.HasOne(d => d.District).WithMany(p => p.Wards).HasConstraintName("FK_Wards_Districts");
+            entity.HasOne(d => d.District).WithMany(p => p.Wards)   .HasConstraintName("FK_Wards_Districts");
         });
 
         OnModelCreatingPartial(modelBuilder);
