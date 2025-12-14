@@ -33,7 +33,7 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.Email) && string.IsNullOrWhiteSpace(request.Phone))
@@ -70,11 +70,9 @@ public class AuthService : IAuthService
             await _emailService.SendAsync(user.Email, "Verify your email", $"Your verification code is: {code}", cancellationToken);
         }
 
-        var (accessToken, expiresAt) = _tokenService.GenerateAccessToken(user);
-        var refreshToken = await IssueRefreshTokenAsync(user.UserId, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return new AuthResponse(user.UserId, user.Email, user.Phone, accessToken, refreshToken, expiresAt);
+        return new RegisterResponse(user.UserId, "Register success");
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -90,7 +88,7 @@ public class AuthService : IAuthService
 
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash, user.Salt))
         {
-            throw new UnauthorizedAccessException("Invalid credentials.");
+            throw new UnauthorizedAccessException("Password is incorrect.");
         }
 
         var (accessToken, expiresAt) = _tokenService.GenerateAccessToken(user);
@@ -105,14 +103,21 @@ public class AuthService : IAuthService
         var token = await _uow.RefreshTokens.Query()
             .FirstOrDefaultAsync(t => t.Token == request.RefreshToken, cancellationToken);
 
-        if (token != null && token.RevokedAt is null)
+        if (token is null)
         {
-            token.RevokedAt = DateTime.UtcNow;
-            _uow.RefreshTokens.Update(token);
-            await _uow.SaveChangesAsync(cancellationToken);
+            return new BasicResponse(false, "Refresh token is invalid.");
         }
 
-        return new BasicResponse(true, "Logged out");
+        if (token.RevokedAt is not null)
+        {
+            return new BasicResponse(false, "Refresh token is already revoked.");
+        }
+
+        token.RevokedAt = DateTime.UtcNow;
+        _uow.RefreshTokens.Update(token);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        return new BasicResponse(true, "Logged out.");
     }
 
     public async Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request, CancellationToken cancellationToken = default)

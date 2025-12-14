@@ -12,8 +12,8 @@ using _2GO_EXE_Project.DAL.Context;
 namespace _2GO_EXE_Project.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251211175325_AddRefreshTokensAndVerificationCodes")]
-    partial class AddRefreshTokensAndVerificationCodes
+    [Migration("20251214135023_InitAll")]
+    partial class InitAll
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

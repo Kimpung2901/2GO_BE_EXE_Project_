@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 
@@ -20,6 +21,25 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
+        var hasEmail = !string.IsNullOrWhiteSpace(request.Email);
+        var hasPhone = !string.IsNullOrWhiteSpace(request.Phone);
+        if (!hasEmail && !hasPhone)
+        {
+            return BadRequest("Please provide email or phone.");
+        }
+        if (hasEmail && !IsValidEmail(request.Email))
+        {
+            return BadRequest("Email must be a valid email address.");
+        }
+        if (hasPhone && !IsValidPhone(request.Phone))
+        {
+            return BadRequest("Phone must be exactly 10 digits.");
+        }
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest("Password is required.");
+        }
+
         var result = await _authService.RegisterAsync(request, cancellationToken);
         return Ok(result);
     }
@@ -28,13 +48,31 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await _authService.LoginAsync(request, cancellationToken);
-        return Ok(result);
+        if (!IsValidIdentifier(request.Identifier))
+        {
+            return BadRequest("Identifier must be a valid email or phone number.");
+        }
+
+        try
+        {
+            var result = await _authService.LoginAsync(request, cancellationToken);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // return 401 with user-friendly message instead of 500 stack trace
+            return Unauthorized(ex.Message);
+        }
     }
 
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            return BadRequest("Refresh token is required.");
+        }
+
         var result = await _authService.LogoutAsync(request, cancellationToken);
         return Ok(result);
     }
@@ -43,14 +81,35 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
     {
-        var result = await _authService.RefreshTokenAsync(request, cancellationToken);
-        return Ok(result);
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            return BadRequest("Refresh token is required.");
+        }
+
+        try
+        {
+            var result = await _authService.RefreshTokenAsync(request, cancellationToken);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
     }
 
     [HttpPost("verify-email")]
     [AllowAnonymous]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest("Email is required.");
+        }
+        if (!IsValidEmail(request.Email))
+        {
+            return BadRequest("Email must be a valid email address.");
+        }
+
         var result = await _authService.VerifyEmailAsync(request, cancellationToken);
         return Ok(result);
     }
@@ -59,6 +118,15 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest("Email is required.");
+        }
+        if (!IsValidEmail(request.Email))
+        {
+            return BadRequest("Email must be a valid email address.");
+        }
+
         var result = await _authService.ForgotPasswordAsync(request, cancellationToken);
         return Ok(result);
     }
@@ -67,7 +135,44 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Code))
+        {
+            return BadRequest("Verification code is required.");
+        }
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            return BadRequest("New password is required.");
+        }
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest("Email is required.");
+        }
+        if (!IsValidEmail(request.Email))
+        {
+            return BadRequest("Email must be a valid email address.");
+        }
+
         var result = await _authService.ResetPasswordAsync(request, cancellationToken);
         return Ok(result);
+    }
+
+    private static bool IsValidIdentifier(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        return IsValidEmail(value) || IsValidPhone(value);
+    }
+
+    private static bool IsValidEmail(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        const string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
+        return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase);
+    }
+
+    private static bool IsValidPhone(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        const string pattern = @"^[0-9]{10}$";
+        return Regex.IsMatch(value, pattern);
     }
 }

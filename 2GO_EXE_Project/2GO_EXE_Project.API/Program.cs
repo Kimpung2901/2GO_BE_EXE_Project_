@@ -5,6 +5,7 @@ using System.Text;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.BAL.Services;
+using _2GO_EXE_Project.BAL.Settings;
 using _2GO_EXE_Project.DAL.Context;
 using _2GO_EXE_Project.DAL.Repositories.Implementations;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
@@ -13,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<GmailEmailSettings>(builder.Configuration.GetSection("Gmail"));
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IEmailService, EmailService>();

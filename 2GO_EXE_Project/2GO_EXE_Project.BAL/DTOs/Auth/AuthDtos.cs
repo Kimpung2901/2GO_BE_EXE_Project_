@@ -7,5 +7,6 @@ public record VerifyEmailRequest(string Email, string Code);
 public record ForgotPasswordRequest(string Email);
 public record ResetPasswordRequest(string Email, string Code, string NewPassword);
 
+public record RegisterResponse(long UserId, string Message);
 public record AuthResponse(long UserId, string? Email, string? Phone, string AccessToken, string RefreshToken, DateTime AccessTokenExpiresAt);
 public record BasicResponse(bool Success, string Message);

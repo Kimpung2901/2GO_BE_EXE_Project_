@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace _2GO_EXE_Project.DAL.Migrations
 {
     /// <inheritdoc />
-    public partial class AddRefreshTokensAndVerificationCodes : Migration
+    public partial class InitAll : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

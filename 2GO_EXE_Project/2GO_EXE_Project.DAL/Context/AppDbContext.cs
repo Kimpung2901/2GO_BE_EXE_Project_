@@ -1,7 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using _2GO_EXE_Project.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
-using _2GO_EXE_Project.DAL.Entities;
+using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
 
 namespace _2GO_EXE_Project.DAL.Context;
 
@@ -94,10 +95,6 @@ public partial class AppDbContext : DbContext
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public virtual DbSet<VerificationCode> VerificationCodes { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=DESKTOP-V4A90EF\\SQLEXPRESS;Database=TwoGoEXE;User ID=sa;Password=123456;TrustServerCertificate=True");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

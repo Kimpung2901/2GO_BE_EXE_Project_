@@ -1,21 +1,98 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using _2GO_EXE_Project.BAL.Interfaces;
+using System.Text;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Auth.OAuth2.Responses;
+using Google.Apis.Gmail.v1;
+using Google.Apis.Gmail.v1.Data;
+using Google.Apis.Services;
+using Google.Apis.Util;
+using _2GO_EXE_Project.BAL.Settings;
 
 namespace _2GO_EXE_Project.BAL.Services;
 
 public class EmailService : IEmailService
 {
+    private readonly GmailEmailSettings _settings;
     private readonly ILogger<EmailService> _logger;
 
-    public EmailService(ILogger<EmailService> logger)
+    public EmailService(IOptions<GmailEmailSettings> options, ILogger<EmailService> logger)
     {
+        _settings = options.Value;
         _logger = logger;
     }
 
-    public Task SendAsync(string to, string subject, string body, CancellationToken cancellationToken = default)
+    public async Task SendAsync(string to, string subject, string body, CancellationToken cancellationToken = default)
     {
-        // TODO: plug real provider (SMTP/SendGrid). For now we log for traceability.
-        _logger.LogInformation("Sending email to {To}. Subject: {Subject}. Body: {Body}", to, subject, body);
-        return Task.CompletedTask;
+        var credential = await CreateCredentialAsync(cancellationToken);
+        var service = new GmailService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = credential,
+            ApplicationName = _settings.ApplicationName
+        });
+
+        var rawMessage = BuildRawMessage(to, subject, body);
+        var request = service.Users.Messages.Send(new Message { Raw = rawMessage }, "me");
+        var response = await request.ExecuteAsync(cancellationToken);
+
+        if (response is null || string.IsNullOrEmpty(response.Id))
+        {
+            _logger.LogError("Failed to send email to {To} via Gmail API", to);
+            throw new InvalidOperationException("Email sending failed");
+        }
+
+        _logger.LogInformation("Sent email to {To} via Gmail API, MessageId: {Id}", to, response.Id);
+    }
+
+    private async Task<UserCredential> CreateCredentialAsync(CancellationToken cancellationToken)
+    {
+        var initializer = new GoogleAuthorizationCodeFlow.Initializer
+        {
+            ClientSecrets = new ClientSecrets
+            {
+                ClientId = _settings.ClientId,
+                ClientSecret = _settings.ClientSecret
+            },
+            Scopes = new[] { GmailService.Scope.GmailSend }
+        };
+
+        var flow = new GoogleAuthorizationCodeFlow(initializer);
+        var token = new TokenResponse
+        {
+            RefreshToken = _settings.RefreshToken
+        };
+
+        var credential = new UserCredential(flow, _settings.UserEmail, token);
+        if (credential.Token.IsExpired(SystemClock.Default))
+        {
+            await credential.RefreshTokenAsync(cancellationToken);
+        }
+
+        return credential;
+    }
+
+    private string BuildRawMessage(string to, string subject, string body)
+    {
+        var from = string.IsNullOrWhiteSpace(_settings.FromName)
+            ? _settings.FromEmail
+            : $"{_settings.FromName} <{_settings.FromEmail}>";
+
+        var encodedSubject = Convert.ToBase64String(Encoding.UTF8.GetBytes(subject));
+        var mime = new StringBuilder();
+        mime.AppendLine("Content-Type: text/html; charset=\"utf-8\"");
+        mime.AppendLine($"From: {from}");
+        mime.AppendLine($"To: {to}");
+        mime.AppendLine($"Subject: =?utf-8?B?{encodedSubject}?=");
+        mime.AppendLine();
+        mime.AppendLine(body);
+
+        var raw = Convert.ToBase64String(Encoding.UTF8.GetBytes(mime.ToString()))
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+
+        return raw;
     }
 }
