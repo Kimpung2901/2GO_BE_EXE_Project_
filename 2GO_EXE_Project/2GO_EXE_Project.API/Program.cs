@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.BAL.Services;
@@ -15,9 +17,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<GmailEmailSettings>(builder.Configuration.GetSection("Gmail"));
+builder.Services.Configure<FirebaseSmsSettings>(builder.Configuration.GetSection("FirebaseSms"));
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ISmsService, FirebaseSmsService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -43,6 +47,36 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 });
+
+// Initialize Firebase Admin (for verifying ID tokens from Firebase Auth)
+var firebaseSection = builder.Configuration.GetSection("Firebase");
+if (FirebaseApp.DefaultInstance == null)
+{
+    var credentialPath = firebaseSection["CredentialsPath"];
+    var projectId = firebaseSection["ProjectId"];
+#pragma warning disable CS0618 // FromFile is marked obsolete in this version; acceptable for setup
+    GoogleCredential credential;
+    var envPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+    if (!string.IsNullOrWhiteSpace(credentialPath) && File.Exists(credentialPath))
+    {
+        credential = GoogleCredential.FromFile(credentialPath);
+    }
+    else if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
+    {
+        credential = GoogleCredential.FromFile(envPath);
+    }
+    else
+    {
+        throw new InvalidOperationException("Firebase credentials not configured. Set Firebase:CredentialsPath or GOOGLE_APPLICATION_CREDENTIALS to a valid service account json.");
+    }
+#pragma warning restore CS0618
+
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = credential,
+        ProjectId = string.IsNullOrWhiteSpace(projectId) ? null : projectId
+    });
+}
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

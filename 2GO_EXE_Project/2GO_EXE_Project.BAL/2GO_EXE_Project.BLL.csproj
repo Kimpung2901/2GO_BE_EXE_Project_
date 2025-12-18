@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FirebaseAdmin" Version="3.4.0" />
 	  <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
 	  <PackageReference Include="Google.Apis.Gmail.v1" Version="1.69.0.3742" />
   </ItemGroup>
@@ -21,7 +22,6 @@
     <Folder Include="Interfaces\" />
     <Folder Include="DTOs\" />
     <Folder Include="Validators\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>
