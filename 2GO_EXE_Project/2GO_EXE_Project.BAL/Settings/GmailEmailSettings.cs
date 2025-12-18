@@ -9,4 +9,5 @@ public class GmailEmailSettings
     public string FromEmail { get; set; } = string.Empty;
     public string FromName { get; set; } = string.Empty;
     public string ApplicationName { get; set; } = "2GO_EXE_Project";
+    public string AppPassword { get; set; } = string.Empty;
 }

@@ -16,7 +16,6 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IEmailService _emailService;
-    private readonly ISmsService _smsService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -25,7 +24,6 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IPasswordHasher passwordHasher,
         IEmailService emailService,
-        ISmsService smsService,
         IOptions<JwtSettings> jwtOptions,
         ILogger<AuthService> logger)
     {
@@ -33,7 +31,6 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _passwordHasher = passwordHasher;
         _emailService = emailService;
-        _smsService = smsService;
         _jwtSettings = jwtOptions.Value;
         _logger = logger;
 
@@ -82,7 +79,14 @@ public class AuthService : IAuthService
         var code = await CreateVerificationCodeAsync(user.UserId, "EmailVerify", cancellationToken);
         if (!string.IsNullOrWhiteSpace(user.Email))
         {
-            await _emailService.SendAsync(user.Email, "Verify your email", $"Your verification code is: {code}", cancellationToken);
+            try
+            {
+                await _emailService.SendAsync(user.Email, "Verify your email", $"Your verification code is: {code}", cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send verification email to {Email}", user.Email);
+            }
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
@@ -228,73 +232,6 @@ public class AuthService : IAuthService
         return new BasicResponse(true, "Email verified.");
     }
 
-    public async Task<BasicResponse> SendPhoneVerificationAsync(SendPhoneVerificationRequest request, CancellationToken cancellationToken = default)
-    {
-        var user = await _uow.Users.Query().FirstOrDefaultAsync(u => u.Phone == request.Phone, cancellationToken);
-        if (user == null)
-        {
-            return new BasicResponse(false, "User not found.");
-        }
-
-        var code = await CreateVerificationCodeAsync(user.UserId, "PhoneVerify", cancellationToken);
-        await _smsService.SendAsync(request.Phone, $"Your verification code is: {code}", cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
-        return new BasicResponse(true, "Verification code sent to phone.");
-    }
-
-    public async Task<BasicResponse> VerifyPhoneAsync(VerifyPhoneRequest request, CancellationToken cancellationToken = default)
-    {
-        var user = await _uow.Users.Query().FirstOrDefaultAsync(u => u.Phone == request.Phone, cancellationToken);
-        if (user == null)
-        {
-            return new BasicResponse(false, "User not found.");
-        }
-
-        var codeEntity = await _uow.VerificationCodes.Query()
-            .FirstOrDefaultAsync(c =>
-                c.UserId == user.UserId &&
-                c.Code == request.Code &&
-                c.Purpose == "PhoneVerify" &&
-                c.ConsumedAt == null &&
-                c.ExpiresAt >= DateTime.UtcNow,
-                cancellationToken);
-
-        if (codeEntity == null)
-        {
-            return new BasicResponse(false, "Code invalid or expired.");
-        }
-
-        codeEntity.ConsumedAt = DateTime.UtcNow;
-        _uow.VerificationCodes.Update(codeEntity);
-
-        var userVerify = await _uow.UserVerifications.Query()
-            .FirstOrDefaultAsync(v => v.UserId == user.UserId, cancellationToken);
-
-        if (userVerify == null)
-        {
-            userVerify = new UserVerification
-            {
-                UserId = user.UserId,
-                PhoneVerified = true,
-                VerifiedAt = DateTime.UtcNow
-            };
-            await _uow.UserVerifications.AddAsync(userVerify, cancellationToken);
-        }
-        else
-        {
-            userVerify.PhoneVerified = true;
-            userVerify.VerifiedAt = DateTime.UtcNow;
-            _uow.UserVerifications.Update(userVerify);
-        }
-
-        await _uow.SaveChangesAsync(cancellationToken);
-
-        // FIX 4: Clean up expired verification codes
-        await CleanupExpiredVerificationCodesAsync(user.UserId, cancellationToken);
-
-        return new BasicResponse(true, "Phone verified.");
-    }
-
     public async Task<AuthResponse> FirebaseLoginAsync(FirebaseLoginRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.IdToken))
@@ -342,14 +279,13 @@ public class AuthService : IAuthService
         }
         else
         {
-            // FIX 3: Check user status for existing users
+            
             if (user.Status != "Active")
             {
                 throw new UnauthorizedAccessException("Account is not active.");
             }
         }
 
-        // FIX 5: Mark both phone and email as verified when Firebase login
         var userVerify = await _uow.UserVerifications.Query()
             .FirstOrDefaultAsync(v => v.UserId == user.UserId, cancellationToken);
         
@@ -397,7 +333,14 @@ public class AuthService : IAuthService
         }
 
         var code = await CreateVerificationCodeAsync(user.UserId, "ForgotPassword", cancellationToken);
-        await _emailService.SendAsync(request.Email, "Reset password", $"Your reset code is: {code}", cancellationToken);
+        try
+        {
+            await _emailService.SendAsync(request.Email, "Reset password", $"Your reset code is: {code}", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send forgot-password email to {Email}", request.Email);
+        }
         await _uow.SaveChangesAsync(cancellationToken);
         return new BasicResponse(true, "If the email exists, a code has been sent.");
     }
@@ -443,7 +386,6 @@ public class AuthService : IAuthService
 
         await _uow.SaveChangesAsync(cancellationToken);
 
-        // FIX 4: Clean up expired verification codes
         await CleanupExpiredVerificationCodesAsync(user.UserId, cancellationToken);
 
         return new BasicResponse(true, "Password reset successful.");
@@ -480,7 +422,6 @@ public class AuthService : IAuthService
         return token;
     }
 
-    // FIX 4: Add method to clean up expired verification codes
     private async Task CleanupExpiredVerificationCodesAsync(long userId, CancellationToken cancellationToken)
     {
         var expiredCodes = await _uow.VerificationCodes.Query()
