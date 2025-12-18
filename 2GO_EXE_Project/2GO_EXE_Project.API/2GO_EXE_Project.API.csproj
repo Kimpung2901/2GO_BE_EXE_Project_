@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="configs\" />
     <Folder Include="ViewModels\" />
     <Folder Include="MappingProfiles\" />
     <Folder Include="Extensions\" />
