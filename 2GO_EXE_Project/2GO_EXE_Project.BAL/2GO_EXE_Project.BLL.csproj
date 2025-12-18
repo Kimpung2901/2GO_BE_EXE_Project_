@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>_2GO_EXE_Project.BLL</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\2GO_EXE_Project.DAL\2GO_EXE_Project.DAL.csproj" />
+    <ProjectReference Include="..\2GO_EXE_Project.Domain\2GO_EXE_Project.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FirebaseAdmin" Version="3.4.0" />
+	  <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+	  <PackageReference Include="Google.Apis.Gmail.v1" Version="1.69.0.3742" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Interfaces\" />
+    <Folder Include="DTOs\" />
+    <Folder Include="Validators\" />
+  </ItemGroup>
+
+</Project>
