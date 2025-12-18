@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
+using System.Security.Claims;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 
@@ -194,5 +195,13 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(ex.Message);
         }
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        var result = await _authService.GetCurrentUserAsync(User, cancellationToken);                       
+        return Ok(result);
     }
 }

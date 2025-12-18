@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FirebaseAdmin;
 using FirebaseAdmin.Auth;
+using System.Security.Claims;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
@@ -322,6 +323,42 @@ public class AuthService : IAuthService
         await _uow.SaveChangesAsync(cancellationToken);
 
         return new AuthResponse(user.UserId, user.Email, user.Phone, accessToken, refreshToken, expiresAt);
+    }
+
+    public async Task<UserInfoResponse> GetCurrentUserAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserVerifications)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var verification = user.UserVerifications.FirstOrDefault();
+        var emailVerified = verification?.EmailVerified ?? false;
+        var phoneVerified = verification?.PhoneVerified ?? false;
+
+        return new UserInfoResponse(
+            user.UserId,
+            user.Email,
+            user.Phone,
+            user.Role,
+            user.Status,
+            user.CreatedAt,
+            user.LastLoginAt,
+            emailVerified,
+            phoneVerified);
     }
 
     public async Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)

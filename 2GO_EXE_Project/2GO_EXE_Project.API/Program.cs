@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
+using Microsoft.OpenApi.Models;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.BAL.Services;
@@ -11,6 +12,8 @@ using _2GO_EXE_Project.BAL.Settings;
 using _2GO_EXE_Project.DAL.Context;
 using _2GO_EXE_Project.DAL.Repositories.Implementations;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,7 +45,9 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtSection.Issuer,
         ValidAudience = jwtSection.Audience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection.Secret)),
-        ClockSkew = TimeSpan.Zero
+        ClockSkew = TimeSpan.Zero,
+        NameClaimType = JwtRegisteredClaimNames.Sub,
+        RoleClaimType = ClaimTypes.Role
     };
 });
 
@@ -78,7 +83,29 @@ if (FirebaseApp.DefaultInstance == null)
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "2GO_EXE_Project API", Version = "v1" });
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter JWT Bearer token",
+        Reference = new OpenApiReference
+        {
+            Type = ReferenceType.SecurityScheme,
+            Id = "Bearer"
+        }
+    };
+    c.AddSecurityDefinition("Bearer", securityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { securityScheme, Array.Empty<string>() }
+    });
+});
 
 var app = builder.Build();
 

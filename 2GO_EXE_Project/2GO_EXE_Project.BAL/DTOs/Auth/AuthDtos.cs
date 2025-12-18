@@ -11,3 +11,4 @@ public record RegisterResponse(long UserId, string Message);
 public record AuthResponse(long UserId, string? Email, string? Phone, string AccessToken, string RefreshToken, DateTime AccessTokenExpiresAt);
 public record BasicResponse(bool Success, string Message);
 public record FirebaseLoginRequest(string IdToken);
+public record UserInfoResponse(long UserId, string? Email, string? Phone, string? Role, string? Status, DateTime? CreatedAt, DateTime? LastLoginAt, bool EmailVerified, bool PhoneVerified);

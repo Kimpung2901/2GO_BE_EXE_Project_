@@ -1,4 +1,5 @@
 using _2GO_EXE_Project.BAL.DTOs.Auth;
+using System.Security.Claims;
 
 namespace _2GO_EXE_Project.BAL.Interfaces;
 
@@ -12,4 +13,5 @@ public interface IAuthService
     Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
     Task<BasicResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
     Task<AuthResponse> FirebaseLoginAsync(FirebaseLoginRequest request, CancellationToken cancellationToken = default);
+    Task<UserInfoResponse> GetCurrentUserAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default);
 }
