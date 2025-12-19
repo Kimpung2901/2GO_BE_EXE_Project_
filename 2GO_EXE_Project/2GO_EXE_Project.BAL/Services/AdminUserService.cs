@@ -4,6 +4,8 @@ using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
+using System.Text.Json;
+using System.Security.Claims;
 
 namespace _2GO_EXE_Project.BAL.Services;
 
@@ -91,7 +93,7 @@ public class AdminUserService : IAdminUserService
             profileInfo);
     }
 
-    public async Task<AdminUserDetail> UpdateUserAsync(long userId, UpdateUserRequest request, CancellationToken cancellationToken = default)
+    public async Task<AdminUserDetail> UpdateUserAsync(ClaimsPrincipal adminPrincipal, long userId, UpdateUserRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.Query()
             .Include(u => u.UserProfiles)
@@ -133,6 +135,8 @@ public class AdminUserService : IAdminUserService
         var verification = user.UserVerifications.FirstOrDefault();
         var profileInfo = new UserProfileInfo(profile.FullName, profile.DateOfBirth, profile.Gender, profile.AddressLine, profile.Bio, profile.AvatarUrl);
 
+        await LogAdminActionAsync(adminPrincipal, "UpdateUser", new { TargetUserId = userId, request.Email, request.Phone, request.Status }, cancellationToken);
+
         return new AdminUserDetail(
             user.UserId,
             user.Email,
@@ -146,7 +150,7 @@ public class AdminUserService : IAdminUserService
             profileInfo);
     }
 
-    public async Task<BasicResponse> UpdateUserRoleAsync(long userId, UpdateUserRoleRequest request, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> UpdateUserRoleAsync(ClaimsPrincipal adminPrincipal, long userId, UpdateUserRoleRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.GetByIdAsync(userId);
         if (user == null)
@@ -157,10 +161,11 @@ public class AdminUserService : IAdminUserService
         user.Role = request.Role;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
+        await LogAdminActionAsync(adminPrincipal, "UpdateRole", new { TargetUserId = userId, NewRole = request.Role }, cancellationToken);
         return new BasicResponse(true, "Role updated.");
     }
 
-    public async Task<BasicResponse> UpdateUserStatusAsync(long userId, UpdateUserStatusRequest request, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> UpdateUserStatusAsync(ClaimsPrincipal adminPrincipal, long userId, UpdateUserStatusRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.GetByIdAsync(userId);
         if (user == null)
@@ -185,10 +190,11 @@ public class AdminUserService : IAdminUserService
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
+        await LogAdminActionAsync(adminPrincipal, "UpdateStatus", new { TargetUserId = userId, NewStatus = request.Status }, cancellationToken);
         return new BasicResponse(true, "Status updated.");
     }
 
-    public async Task<BasicResponse> DeleteUserAsync(long userId, CancellationToken cancellationToken = default)
+    public async Task<BasicResponse> DeleteUserAsync(ClaimsPrincipal adminPrincipal, long userId, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.GetByIdAsync(userId);
         if (user == null)
@@ -209,6 +215,48 @@ public class AdminUserService : IAdminUserService
         _uow.RefreshTokens.UpdateRange(tokens);
 
         await _uow.SaveChangesAsync(cancellationToken);
+        await LogAdminActionAsync(adminPrincipal, "DeleteUser", new { TargetUserId = userId, Status = "Deleted" }, cancellationToken);
         return new BasicResponse(true, "User deleted (soft).");
+    }
+
+    public async Task<IReadOnlyList<ActivityResponse>> GetAuditLogsAsync(int skip, int take, CancellationToken cancellationToken = default)
+    {
+        var logs = await _uow.ActivityLogs.Query()
+            .OrderByDescending(l => l.CreatedAt)
+            .Skip(skip < 0 ? 0 : skip)
+            .Take(take <= 0 ? 50 : take)
+            .Select(l => new ActivityResponse(l.LogId, l.Action, l.Details, l.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return logs;
+    }
+
+    private long? GetAdminId(ClaimsPrincipal principal)
+    {
+        var sub = principal.FindFirst("sub")?.Value
+                  ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? principal.FindFirst(ClaimTypes.Name)?.Value;
+        if (long.TryParse(sub, out var id)) return id;
+        return null;
+    }
+
+    private async Task LogAdminActionAsync(ClaimsPrincipal adminPrincipal, string action, object details, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var log = new ActivityLog
+            {
+                UserId = GetAdminId(adminPrincipal),
+                Action = action,
+                Details = JsonSerializer.Serialize(details),
+                CreatedAt = DateTime.UtcNow
+            };
+            await _uow.ActivityLogs.AddAsync(log, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to log admin action {Action}", action);
+        }
     }
 }

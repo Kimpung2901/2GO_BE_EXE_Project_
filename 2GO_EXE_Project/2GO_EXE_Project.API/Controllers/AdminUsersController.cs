@@ -35,14 +35,14 @@ public class AdminUsersController : ControllerBase
     [HttpPatch("{id:long}")]
     public async Task<IActionResult> UpdateUser(long id, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
     {
-        var user = await _adminUserService.UpdateUserAsync(id, request, cancellationToken);
+        var user = await _adminUserService.UpdateUserAsync(User, id, request, cancellationToken);
         return Ok(user);
     }
 
     [HttpPut("{id:long}/role")]
     public async Task<IActionResult> UpdateRole(long id, [FromBody] UpdateUserRoleRequest request, CancellationToken cancellationToken)
     {
-        var result = await _adminUserService.UpdateUserRoleAsync(id, request, cancellationToken);
+        var result = await _adminUserService.UpdateUserRoleAsync(User, id, request, cancellationToken);
         if (!result.Success) return BadRequest(result.Message);
         return Ok(result);
     }
@@ -50,7 +50,7 @@ public class AdminUsersController : ControllerBase
     [HttpPut("{id:long}/status")]
     public async Task<IActionResult> UpdateStatus(long id, [FromBody] UpdateUserStatusRequest request, CancellationToken cancellationToken)
     {
-        var result = await _adminUserService.UpdateUserStatusAsync(id, request, cancellationToken);
+        var result = await _adminUserService.UpdateUserStatusAsync(User, id, request, cancellationToken);
         if (!result.Success) return BadRequest(result.Message);
         return Ok(result);
     }
@@ -58,7 +58,7 @@ public class AdminUsersController : ControllerBase
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, CancellationToken cancellationToken)
     {
-        var result = await _adminUserService.DeleteUserAsync(id, cancellationToken);
+        var result = await _adminUserService.DeleteUserAsync(User, id, cancellationToken);
         if (!result.Success) return NotFound(result.Message);
         return Ok(result);
     }
