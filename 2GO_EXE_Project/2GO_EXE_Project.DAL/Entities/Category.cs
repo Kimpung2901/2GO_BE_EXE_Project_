@@ -19,6 +19,10 @@ public partial class Category
     [Unicode(false)]
     public string? IconUrl { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public int SortOrder { get; set; }
+
     [InverseProperty("Category")]
     public virtual ICollection<SubCategory> SubCategories { get; set; } = new List<SubCategory>();
 }

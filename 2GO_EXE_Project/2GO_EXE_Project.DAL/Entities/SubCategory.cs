@@ -17,6 +17,10 @@ public partial class SubCategory
     [Unicode(false)]
     public string? Name { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public int SortOrder { get; set; }
+
     [ForeignKey("CategoryId")]
     [InverseProperty("SubCategories")]
     public virtual Category? Category { get; set; }
