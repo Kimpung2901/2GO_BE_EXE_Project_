@@ -346,6 +346,15 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("User not found.");
         }
 
+        // auto unban if expired
+        if (user.Status == "Banned" && user.BanUntil != null && user.BanUntil <= DateTime.UtcNow)
+        {
+            user.Status = "Active";
+            user.BanUntil = null;
+            _uow.Users.Update(user);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+
         var verification = user.UserVerifications.FirstOrDefault();
         var emailVerified = verification?.EmailVerified ?? false;
         var phoneVerified = verification?.PhoneVerified ?? false;

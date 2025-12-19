@@ -35,6 +35,7 @@ public record AdminUserDetail(
     string? Phone,
     string? Role,
     string? Status,
+    DateTime? BanUntil,
     DateTime? CreatedAt,
     DateTime? LastLoginAt,
     bool EmailVerified,
@@ -47,3 +48,8 @@ public record AdminCreateUserRequest(string? Email, string? Phone, string? Passw
 public record AdminUserListResponse(int Total, IReadOnlyList<AdminUserSummary> Items);
 public record UpdateAvatarRequest(string AvatarUrl);
 public record UpdateAddressRequest(string? Address, int? CityId, int? DistrictId, int? WardId);
+public record BanUserRequest(string Reason, int? DurationDays);
+public record ReportSummary(long ReportId, long? ReporterId, long? TargetUserId, long? ListingId, string? Reason, string? Status, DateTime? CreatedAt);
+public record ReportDetail(long ReportId, long? ReporterId, long? TargetUserId, long? ListingId, string? Reason, string? Status, DateTime? CreatedAt);
+public record ReportListResponse(int Total, IReadOnlyList<ReportSummary> Items);
+public record ResolveReportRequest(string? Status, string? Note);
