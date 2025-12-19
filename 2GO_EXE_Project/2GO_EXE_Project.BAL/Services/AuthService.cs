@@ -338,6 +338,7 @@ public class AuthService : IAuthService
 
         var user = await _uow.Users.Query()
             .Include(u => u.UserVerifications)
+            .Include(u => u.UserProfiles)
             .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
 
         if (user == null)
@@ -348,6 +349,16 @@ public class AuthService : IAuthService
         var verification = user.UserVerifications.FirstOrDefault();
         var emailVerified = verification?.EmailVerified ?? false;
         var phoneVerified = verification?.PhoneVerified ?? false;
+        var profile = user.UserProfiles.FirstOrDefault();
+        var profileInfo = profile == null
+            ? null
+            : new UserProfileInfo(
+                profile.FullName,
+                profile.DateOfBirth,
+                profile.Gender,
+                profile.AddressLine,
+                profile.Bio,
+                profile.AvatarUrl);
 
         return new UserInfoResponse(
             user.UserId,
@@ -358,7 +369,186 @@ public class AuthService : IAuthService
             user.CreatedAt,
             user.LastLoginAt,
             emailVerified,
-            phoneVerified);
+            phoneVerified,
+            profileInfo);
+    }
+
+    public async Task<UserInfoResponse> UpdateCurrentUserProfileAsync(ClaimsPrincipal userPrincipal, UpdateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserVerifications)
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var profile = user.UserProfiles.FirstOrDefault();
+        var isNewProfile = profile == null;
+        if (profile == null)
+        {
+            profile = new UserProfile
+            {
+                UserId = user.UserId
+            };
+            await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+        }
+
+        profile.FullName = request.FullName ?? profile.FullName;
+        profile.DateOfBirth = request.Birthday ?? profile.DateOfBirth;
+        profile.Gender = request.Gender ?? profile.Gender;
+        profile.AddressLine = request.Address ?? profile.AddressLine;
+        profile.Bio = request.Bio ?? profile.Bio;
+        profile.AvatarUrl = request.AvatarUrl ?? profile.AvatarUrl;
+
+        if (!isNewProfile)
+        {
+            _uow.UserProfiles.Update(profile);
+        }
+
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        var verification = user.UserVerifications.FirstOrDefault();
+        var emailVerified = verification?.EmailVerified ?? false;
+        var phoneVerified = verification?.PhoneVerified ?? false;
+
+        var profileInfo = new UserProfileInfo(
+            profile.FullName,
+            profile.DateOfBirth,
+            profile.Gender,
+            profile.AddressLine,
+            profile.Bio,
+            profile.AvatarUrl);
+
+        return new UserInfoResponse(
+            user.UserId,
+            user.Email,
+            user.Phone,
+            user.Role,
+            user.Status,
+            user.CreatedAt,
+            user.LastLoginAt,
+            emailVerified,
+            phoneVerified,
+            profileInfo);
+    }
+
+    public async Task<BasicResponse> ChangePasswordAsync(ClaimsPrincipal userPrincipal, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null || string.IsNullOrEmpty(user.PasswordHash) || string.IsNullOrEmpty(user.Salt))
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        if (!_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash, user.Salt))
+        {
+            return new BasicResponse(false, "Current password is incorrect.");
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword, out var newSalt);
+        user.Salt = newSalt;
+        _uow.Users.Update(user);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        // revoke all refresh tokens to force re-login
+        var tokens = await _uow.RefreshTokens.Query()
+            .Where(t => t.UserId == user.UserId && t.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var t in tokens)
+        {
+            t.RevokedAt = DateTime.UtcNow;
+        }
+        _uow.RefreshTokens.UpdateRange(tokens);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        return new BasicResponse(true, "Password changed. Please login again.");
+    }
+
+    public async Task<IReadOnlyList<DeviceResponse>> GetMyDevicesAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var devices = await _uow.UserDevices.Query()
+            .Where(d => d.UserId == userId)
+            .OrderByDescending(d => d.LastActive)
+            .Select(d => new DeviceResponse(d.DeviceId, d.DeviceInfo, d.Ipaddress, d.LastActive))
+            .ToListAsync(cancellationToken);
+
+        return devices;
+    }
+
+    public async Task<BasicResponse> RemoveMyDeviceAsync(ClaimsPrincipal userPrincipal, long deviceId, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var device = await _uow.UserDevices.Query()
+            .FirstOrDefaultAsync(d => d.DeviceId == deviceId && d.UserId == userId, cancellationToken);
+
+        if (device == null)
+        {
+            return new BasicResponse(false, "Device not found.");
+        }
+
+        _uow.UserDevices.Remove(device);
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new BasicResponse(true, "Device removed.");
+    }
+
+    public async Task<IReadOnlyList<ActivityResponse>> GetMyActivityAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var logs = await _uow.ActivityLogs.Query()
+            .Where(l => l.UserId == userId)
+            .OrderByDescending(l => l.CreatedAt)
+            .Select(l => new ActivityResponse(l.LogId, l.Action, l.Details, l.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return logs;
     }
 
     public async Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
