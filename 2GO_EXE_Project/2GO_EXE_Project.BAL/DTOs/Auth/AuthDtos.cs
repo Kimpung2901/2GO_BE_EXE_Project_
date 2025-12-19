@@ -43,3 +43,7 @@ public record AdminUserDetail(
 public record UpdateUserRequest(string? Email, string? Phone, string? Status, string? FullName, DateOnly? Birthday, string? Gender, string? Address, string? Bio, string? AvatarUrl);
 public record UpdateUserRoleRequest(string Role);
 public record UpdateUserStatusRequest(string Status);
+public record AdminCreateUserRequest(string? Email, string? Phone, string? Password, string Role, string Status, string? FullName, DateOnly? Birthday, string? Gender, string? Address, string? Bio, string? AvatarUrl);
+public record AdminUserListResponse(int Total, IReadOnlyList<AdminUserSummary> Items);
+public record UpdateAvatarRequest(string AvatarUrl);
+public record UpdateAddressRequest(string? Address, int? CityId, int? DistrictId, int? WardId);

@@ -24,6 +24,13 @@ public class AdminUsersController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost]
+    public async Task<IActionResult> CreateUser([FromBody] AdminCreateUserRequest request, CancellationToken cancellationToken)
+    {
+        var user = await _adminUserService.CreateUserAsync(User, request, cancellationToken);
+        return Ok(user);
+    }
+
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetUser(long id, CancellationToken cancellationToken)
     {

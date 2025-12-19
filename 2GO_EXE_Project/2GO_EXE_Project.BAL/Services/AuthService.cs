@@ -551,6 +551,84 @@ public class AuthService : IAuthService
         return logs;
     }
 
+    public async Task<BasicResponse> UpdateAvatarAsync(ClaimsPrincipal userPrincipal, UpdateAvatarRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var profile = user.UserProfiles.FirstOrDefault();
+        var isNew = profile == null;
+        if (profile == null)
+        {
+            profile = new UserProfile { UserId = userId };
+            await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+        }
+
+        profile.AvatarUrl = request.AvatarUrl;
+        if (!isNew)
+        {
+            _uow.UserProfiles.Update(profile);
+        }
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new BasicResponse(true, "Avatar updated.");
+    }
+
+    public async Task<BasicResponse> UpdateAddressAsync(ClaimsPrincipal userPrincipal, UpdateAddressRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var profile = user.UserProfiles.FirstOrDefault();
+        var isNew = profile == null;
+        if (profile == null)
+        {
+            profile = new UserProfile { UserId = userId };
+            await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+        }
+
+        profile.AddressLine = request.Address ?? profile.AddressLine;
+        profile.CityId = request.CityId ?? profile.CityId;
+        profile.DistrictId = request.DistrictId ?? profile.DistrictId;
+        profile.WardId = request.WardId ?? profile.WardId;
+
+        if (!isNew)
+        {
+            _uow.UserProfiles.Update(profile);
+        }
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new BasicResponse(true, "Address updated.");
+    }
+
     public async Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.Query().FirstOrDefaultAsync(u => u.Email == request.Email, cancellationToken);

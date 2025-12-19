@@ -13,14 +13,16 @@ public class AdminUserService : IAdminUserService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<AdminUserService> _logger;
+    private readonly IPasswordHasher _passwordHasher;
 
-    public AdminUserService(IUnitOfWork uow, ILogger<AdminUserService> logger)
+    public AdminUserService(IUnitOfWork uow, IPasswordHasher passwordHasher, ILogger<AdminUserService> logger)
     {
         _uow = uow;
+        _passwordHasher = passwordHasher;
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<AdminUserSummary>> GetUsersAsync(string? search, string? role, string? status, int skip, int take, CancellationToken cancellationToken = default)
+    public async Task<AdminUserListResponse> GetUsersAsync(string? search, string? role, string? status, int skip, int take, CancellationToken cancellationToken = default)
     {
         var query = _uow.Users.Query()
             .Include(u => u.UserVerifications)
@@ -45,6 +47,8 @@ public class AdminUserService : IAdminUserService
             query = query.Where(u => u.Status == status);
         }
 
+        var total = await query.CountAsync(cancellationToken);
+
         var users = await query
             .OrderByDescending(u => u.CreatedAt)
             .Skip(skip < 0 ? 0 : skip)
@@ -62,7 +66,7 @@ public class AdminUserService : IAdminUserService
                 u.UserProfiles.FirstOrDefault().FullName))
             .ToListAsync(cancellationToken);
 
-        return users;
+        return new AdminUserListResponse(total, users);
     }
 
     public async Task<AdminUserDetail?> GetUserByIdAsync(long userId, CancellationToken cancellationToken = default)
@@ -90,6 +94,77 @@ public class AdminUserService : IAdminUserService
             user.LastLoginAt,
             verification?.EmailVerified ?? false,
             verification?.PhoneVerified ?? false,
+            profileInfo);
+    }
+
+    public async Task<AdminUserDetail> CreateUserAsync(ClaimsPrincipal adminPrincipal, AdminCreateUserRequest request, CancellationToken cancellationToken = default)
+    {
+        var exists = await _uow.Users.Query()
+            .AnyAsync(u => (!string.IsNullOrEmpty(request.Email) && u.Email == request.Email) || (!string.IsNullOrEmpty(request.Phone) && u.Phone == request.Phone), cancellationToken);
+        if (exists)
+        {
+            throw new InvalidOperationException("User already exists.");
+        }
+
+        string? passwordHash = null;
+        string? salt = null;
+        if (!string.IsNullOrEmpty(request.Password))
+        {
+            passwordHash = _passwordHasher.HashPassword(request.Password, out salt);
+        }
+
+        var user = new User
+        {
+            Email = request.Email,
+            Phone = request.Phone,
+            PasswordHash = passwordHash,
+            Salt = salt,
+            Role = request.Role,
+            Status = request.Status,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _uow.Users.AddAsync(user, cancellationToken);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        // profile
+        var profile = new UserProfile
+        {
+            UserId = user.UserId,
+            FullName = request.FullName,
+            DateOfBirth = request.Birthday,
+            Gender = request.Gender,
+            AddressLine = request.Address,
+            Bio = request.Bio,
+            AvatarUrl = request.AvatarUrl
+        };
+        await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+
+        // verification default
+        var verification = new UserVerification
+        {
+            UserId = user.UserId,
+            EmailVerified = false,
+            PhoneVerified = false,
+            VerifiedAt = null
+        };
+        await _uow.UserVerifications.AddAsync(verification, cancellationToken);
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        await LogAdminActionAsync(adminPrincipal, "CreateUser", new { TargetUserId = user.UserId, request.Email, request.Phone, request.Role, request.Status }, cancellationToken);
+
+        var profileInfo = new UserProfileInfo(profile.FullName, profile.DateOfBirth, profile.Gender, profile.AddressLine, profile.Bio, profile.AvatarUrl);
+
+        return new AdminUserDetail(
+            user.UserId,
+            user.Email,
+            user.Phone,
+            user.Role,
+            user.Status,
+            user.CreatedAt,
+            user.LastLoginAt,
+            verification.EmailVerified ?? false,
+            verification.PhoneVerified ?? false,
             profileInfo);
     }
 
