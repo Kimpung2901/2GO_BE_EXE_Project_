@@ -4,6 +4,7 @@ namespace _2GO_EXE_Project.BAL.Interfaces;
 
 public interface ISubCategoryService
 {
+    Task<SubCategoryListResponse> GetAllAsync(bool? isActive, int? categoryId, int skip, int take, CancellationToken cancellationToken = default);
     Task<SubCategoryListResponse> GetByCategoryAsync(int categoryId, bool? isActive, int skip, int take, CancellationToken cancellationToken = default);
     Task<SubCategoryResponse?> GetByIdAsync(int id, bool onlyActive, CancellationToken cancellationToken = default);
     Task<SubCategoryResponse> CreateAsync(int categoryId, CreateSubCategoryRequest request, CancellationToken cancellationToken = default);

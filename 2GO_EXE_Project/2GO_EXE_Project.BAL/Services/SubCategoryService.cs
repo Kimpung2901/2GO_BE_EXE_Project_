@@ -15,6 +15,30 @@ public class SubCategoryService : ISubCategoryService
         _uow = uow;
     }
 
+    public async Task<SubCategoryListResponse> GetAllAsync(bool? isActive, int? categoryId, int skip, int take, CancellationToken cancellationToken = default)
+    {
+        var query = _uow.SubCategories.Query().AsQueryable();
+        if (categoryId.HasValue)
+        {
+            query = query.Where(sc => sc.CategoryId == categoryId.Value);
+        }
+        if (isActive.HasValue)
+        {
+            query = query.Where(sc => sc.IsActive == isActive.Value);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(sc => sc.SortOrder)
+            .ThenBy(sc => sc.Name)
+            .Skip(skip < 0 ? 0 : skip)
+            .Take(take <= 0 ? 20 : take)
+            .Select(sc => new SubCategoryResponse(sc.SubCategoryId, sc.CategoryId ?? 0, sc.Name, sc.IsActive, sc.SortOrder))
+            .ToListAsync(cancellationToken);
+
+        return new SubCategoryListResponse(total, items);
+    }
+
     public async Task<SubCategoryListResponse> GetByCategoryAsync(int categoryId, bool? isActive, int skip, int take, CancellationToken cancellationToken = default)
     {
         var query = _uow.SubCategories.Query().Where(sc => sc.CategoryId == categoryId);

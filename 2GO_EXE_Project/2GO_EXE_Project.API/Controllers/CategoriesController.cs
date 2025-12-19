@@ -17,9 +17,9 @@ public class CategoriesController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> Get([FromQuery] string? search, [FromQuery] int skip = 0, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Get([FromQuery] string? search, [FromQuery] int skip = 0, [FromQuery] int take = 100, [FromQuery] bool includeSubCategories = false, CancellationToken cancellationToken = default)
     {
-        var result = await _categoryService.GetCategoriesAsync(search, skip, take, cancellationToken);
+        var result = await _categoryService.GetCategoriesAsync(search, skip, take, includeSubCategories, true, cancellationToken);
         return Ok(result);
     }
 
@@ -27,7 +27,7 @@ public class CategoriesController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
-        var category = await _categoryService.GetByIdAsync(id, cancellationToken);
+        var category = await _categoryService.GetByIdAsync(id, true, true, cancellationToken);
         if (category == null) return NotFound();
         return Ok(category);
     }
