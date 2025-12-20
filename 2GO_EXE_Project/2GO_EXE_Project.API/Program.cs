@@ -29,6 +29,9 @@ builder.Services.AddScoped<IModeratorService, ModeratorService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<ISubCategoryService, SubCategoryService>();
 builder.Services.AddScoped<IListingService, ListingService>();
+builder.Services.AddScoped<ISellerListingService, SellerListingService>();
+builder.Services.AddScoped<IAdminListingService, AdminListingService>();
+builder.Services.AddScoped<IModeratorListingService, ModeratorListingService>();
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddDbContext<AppDbContext>(options =>

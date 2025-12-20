@@ -33,3 +33,7 @@ public record ListingDetail(
     IReadOnlyList<string> Images);
 
 public record ListingListResponse(int Total, IReadOnlyList<ListingListItem> Items);
+
+public record RejectListingRequest(string Reason);
+public record FlagListingRequest(string Reason);
+public record UpdateListingStatusRequest(string Status);

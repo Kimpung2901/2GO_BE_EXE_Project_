@@ -55,7 +55,7 @@ public class ListingService : IListingService
         var items = await query
             .OrderByDescending(l => l.CreatedAt)
             .Skip(skip < 0 ? 0 : skip)
-            .Take(take <= 0 ? 20 : take)
+            .Take(take <= 0 ? 20 : Math.Min(take, 100))
             .Select(l => new ListingListItem(
                 l.ListingId,
                 l.Title,
