@@ -57,12 +57,50 @@ public class ModeratorListingService : IModeratorListingService
                 l.CreatedAt,
                 l.SubCategory != null ? l.SubCategory.CategoryId : null,
                 l.SubCategoryId,
-                l.SubCategory != null ? l.SubCategory.Category?.Name : null,
+                l.SubCategory != null && l.SubCategory.Category != null ? l.SubCategory.Category.Name : null,
                 l.SubCategory != null ? l.SubCategory.Name : null,
                 l.ListingImages.OrderByDescending(i => i.IsPrimary == true).ThenBy(i => i.ImageId).Select(i => i.ImageUrl).FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return new ListingListResponse(total, items);
+    }
+
+    public async Task<ListingDetail?> GetByIdAsync(long listingId, CancellationToken cancellationToken = default)
+    {
+        var listing = await _uow.Listings.Query()
+            .Include(l => l.SubCategory)
+            .ThenInclude(sc => sc.Category)
+            .Include(l => l.ListingImages)
+            .Include(l => l.Seller)
+            .FirstOrDefaultAsync(l => l.ListingId == listingId, cancellationToken);
+        if (listing == null) return null;
+
+        var images = listing.ListingImages
+            .OrderByDescending(i => i.IsPrimary == true)
+            .ThenBy(i => i.ImageId)
+            .Select(i => i.ImageUrl ?? string.Empty)
+            .ToList();
+        var primary = images.FirstOrDefault();
+
+        return new ListingDetail(
+            listing.ListingId,
+            listing.Title,
+            listing.Description,
+            listing.Price,
+            listing.HasNegotiation,
+            listing.Condition,
+            listing.Brand,
+            listing.Status,
+            listing.CreatedAt,
+            listing.UpdatedAt,
+            listing.SubCategory?.CategoryId,
+            listing.SubCategoryId,
+            listing.SubCategory?.Category?.Name,
+            listing.SubCategory?.Name,
+            listing.Seller?.Email,
+            listing.Seller?.Phone,
+            primary,
+            images);
     }
 
     public async Task<BasicResponse> ApproveAsync(ClaimsPrincipal modPrincipal, long listingId, CancellationToken cancellationToken = default)

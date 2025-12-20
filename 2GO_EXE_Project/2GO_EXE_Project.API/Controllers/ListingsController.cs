@@ -17,9 +17,41 @@ public class ListingsController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> Get([FromQuery] string? search, [FromQuery] int? categoryId, [FromQuery] int? subCategoryId, [FromQuery] decimal? minPrice, [FromQuery] decimal? maxPrice, [FromQuery] string? status, [FromQuery] int skip = 0, [FromQuery] int take = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? search,
+        [FromQuery] int? categoryId,
+        [FromQuery] int? subCategoryId,
+        [FromQuery] decimal? minPrice,
+        [FromQuery] decimal? maxPrice,
+        [FromQuery] string? status,
+        [FromQuery] string? condition,
+        [FromQuery] string? brand,
+        [FromQuery] int? wardId,
+        [FromQuery] int? districtId,
+        [FromQuery] int? cityId,
+        [FromQuery] bool? hasNegotiation,
+        [FromQuery] string? sort,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _listingService.GetListingsAsync(search, categoryId, subCategoryId, minPrice, maxPrice, status, skip, take, cancellationToken);
+        var result = await _listingService.GetListingsAsync(
+            search,
+            categoryId,
+            subCategoryId,
+            minPrice,
+            maxPrice,
+            status,
+            condition,
+            brand,
+            wardId,
+            districtId,
+            cityId,
+            hasNegotiation,
+            sort,
+            skip,
+            take,
+            cancellationToken);
         return Ok(result);
     }
 
@@ -27,8 +59,16 @@ public class ListingsController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetById(long id, CancellationToken cancellationToken = default)
     {
-        var listing = await _listingService.GetListingByIdAsync(id, true, cancellationToken);
+        var userId = GetUserIdOrNull();
+        var listing = await _listingService.GetListingByIdAsync(id, true, userId, cancellationToken);
         if (listing == null) return NotFound();
         return Ok(listing);
+    }
+
+    private long? GetUserIdOrNull()
+    {
+        var sub = User.FindFirst("sub")?.Value;
+        if (long.TryParse(sub, out var id)) return id;
+        return null;
     }
 }

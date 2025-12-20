@@ -8,18 +8,38 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class ListingService : IListingService
 {
     private readonly IUnitOfWork _uow;
+    private const string StatusActive = "Active";
 
     public ListingService(IUnitOfWork uow)
     {
         _uow = uow;
     }
 
-    public async Task<ListingListResponse> GetListingsAsync(string? search, int? categoryId, int? subCategoryId, decimal? minPrice, decimal? maxPrice, string? status, int skip, int take, CancellationToken cancellationToken = default)
+    public async Task<ListingListResponse> GetListingsAsync(
+        string? search,
+        int? categoryId,
+        int? subCategoryId,
+        decimal? minPrice,
+        decimal? maxPrice,
+        string? status,
+        string? condition,
+        string? brand,
+        int? wardId,
+        int? districtId,
+        int? cityId,
+        bool? hasNegotiation,
+        string? sort,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         var query = _uow.Listings.Query()
             .Include(l => l.SubCategory)
             .ThenInclude(sc => sc.Category)
             .Include(l => l.ListingImages)
+            .Include(l => l.Ward)
+            .ThenInclude(w => w.District)
+            .ThenInclude(d => d.City)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -48,12 +68,43 @@ public class ListingService : IListingService
         }
         else
         {
-            query = query.Where(l => l.Status == "Active");
+            query = query.Where(l => l.Status == StatusActive);
+        }
+        if (!string.IsNullOrWhiteSpace(condition))
+        {
+            query = query.Where(l => l.Condition != null && l.Condition.Contains(condition));
+        }
+        if (!string.IsNullOrWhiteSpace(brand))
+        {
+            query = query.Where(l => l.Brand != null && l.Brand.Contains(brand));
+        }
+        if (wardId.HasValue)
+        {
+            query = query.Where(l => l.WardId == wardId.Value);
+        }
+        if (districtId.HasValue)
+        {
+            query = query.Where(l => l.Ward != null && l.Ward.DistrictId == districtId.Value);
+        }
+        if (cityId.HasValue)
+        {
+            query = query.Where(l => l.Ward != null && l.Ward.District != null && l.Ward.District.CityId == cityId.Value);
+        }
+        if (hasNegotiation.HasValue)
+        {
+            query = query.Where(l => l.HasNegotiation == hasNegotiation.Value);
         }
 
         var total = await query.CountAsync(cancellationToken);
-        var items = await query
-            .OrderByDescending(l => l.CreatedAt)
+        var ordered = sort?.ToLowerInvariant() switch
+        {
+            "price_asc" => query.OrderBy(l => l.Price),
+            "price_desc" => query.OrderByDescending(l => l.Price),
+            "oldest" => query.OrderBy(l => l.CreatedAt),
+            _ => query.OrderByDescending(l => l.CreatedAt)
+        };
+
+        var items = await ordered
             .Skip(skip < 0 ? 0 : skip)
             .Take(take <= 0 ? 20 : Math.Min(take, 100))
             .Select(l => new ListingListItem(
@@ -72,7 +123,7 @@ public class ListingService : IListingService
         return new ListingListResponse(total, items);
     }
 
-    public async Task<ListingDetail?> GetListingByIdAsync(long listingId, bool onlyActive, CancellationToken cancellationToken = default)
+    public async Task<ListingDetail?> GetListingByIdAsync(long listingId, bool onlyActive, long? viewerUserId, CancellationToken cancellationToken = default)
     {
         var query = _uow.Listings.Query()
             .Include(l => l.SubCategory)
@@ -83,11 +134,13 @@ public class ListingService : IListingService
 
         if (onlyActive)
         {
-            query = query.Where(l => l.Status == "Active");
+            query = query.Where(l => l.Status == StatusActive);
         }
 
         var listing = await query.FirstOrDefaultAsync(cancellationToken);
         if (listing == null) return null;
+
+        await TrackViewAsync(listing.ListingId, viewerUserId, cancellationToken);
 
         var images = listing.ListingImages
             .OrderByDescending(img => img.IsPrimary == true)
@@ -115,5 +168,24 @@ public class ListingService : IListingService
             listing.Seller?.Phone,
             primary,
             images);
+    }
+
+    private async Task TrackViewAsync(long listingId, long? viewerUserId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var view = new _2GO_EXE_Project.DAL.Entities.ListingView
+            {
+                ListingId = listingId,
+                UserId = viewerUserId,
+                ViewedAt = DateTime.UtcNow
+            };
+            await _uow.ListingViews.AddAsync(view, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // ignore tracking failures
+        }
     }
 }

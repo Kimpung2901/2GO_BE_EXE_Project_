@@ -75,7 +75,7 @@ public class AdminListingService : IAdminListingService
                 l.CreatedAt,
                 l.SubCategory != null ? l.SubCategory.CategoryId : null,
                 l.SubCategoryId,
-                l.SubCategory != null ? l.SubCategory.Category?.Name : null,
+                l.SubCategory != null && l.SubCategory.Category != null ? l.SubCategory.Category.Name : null,
                 l.SubCategory != null ? l.SubCategory.Name : null,
                 l.ListingImages.OrderByDescending(i => i.IsPrimary == true).ThenBy(i => i.ImageId).Select(i => i.ImageUrl).FirstOrDefault()))
             .ToListAsync(cancellationToken);

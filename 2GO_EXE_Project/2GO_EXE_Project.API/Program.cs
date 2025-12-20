@@ -32,6 +32,10 @@ builder.Services.AddScoped<IListingService, ListingService>();
 builder.Services.AddScoped<ISellerListingService, SellerListingService>();
 builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IModeratorListingService, ModeratorListingService>();
+builder.Services.AddScoped<ISavedListingService, SavedListingService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddDbContext<AppDbContext>(options =>

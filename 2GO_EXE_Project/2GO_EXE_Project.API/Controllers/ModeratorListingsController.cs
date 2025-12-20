@@ -24,6 +24,14 @@ public class ModeratorListingsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> GetById(long id, CancellationToken cancellationToken = default)
+    {
+        var listing = await _modListingService.GetByIdAsync(id, cancellationToken);
+        if (listing == null) return NotFound();
+        return Ok(listing);
+    }
+
     [HttpPut("{id:long}/approve")]
     public async Task<IActionResult> Approve(long id, CancellationToken cancellationToken = default)
     {

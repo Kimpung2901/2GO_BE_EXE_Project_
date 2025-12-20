@@ -32,6 +32,14 @@ public class SellerListingsController : ControllerBase
         return Ok(listing);
     }
 
+    [HttpGet("{id:long}/stats")]
+    public async Task<IActionResult> GetStats(long id, CancellationToken cancellationToken = default)
+    {
+        var stats = await _sellerListingService.GetMyListingStatsAsync(User, id, cancellationToken);
+        if (stats == null) return NotFound();
+        return Ok(stats);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateSellerListingRequest request, CancellationToken cancellationToken = default)
     {

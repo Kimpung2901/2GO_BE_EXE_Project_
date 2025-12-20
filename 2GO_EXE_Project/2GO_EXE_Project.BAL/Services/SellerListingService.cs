@@ -327,4 +327,21 @@ public class SellerListingService : ISellerListingService
         await _uow.SaveChangesAsync(cancellationToken);
         return new BasicResponse(true, "Images updated.");
     }
+
+    public async Task<ListingStatsResponse?> GetMyListingStatsAsync(ClaimsPrincipal sellerPrincipal, long listingId, CancellationToken cancellationToken = default)
+    {
+        var sellerId = GetUserId(sellerPrincipal);
+        var listingExists = await _uow.Listings.Query()
+            .AnyAsync(l => l.ListingId == listingId && l.SellerId == sellerId, cancellationToken);
+        if (!listingExists) return null;
+
+        var views = await _uow.ListingViews.Query()
+            .CountAsync(v => v.ListingId == listingId, cancellationToken);
+        var saves = await _uow.SavedListings.Query()
+            .CountAsync(s => s.ListingId == listingId, cancellationToken);
+        var inquiries = await _uow.Orders.Query()
+            .CountAsync(o => o.ListingId == listingId, cancellationToken);
+
+        return new ListingStatsResponse(listingId, views, saves, inquiries);
+    }
 }
