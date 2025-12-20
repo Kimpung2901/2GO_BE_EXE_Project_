@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Listings;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
@@ -8,8 +9,6 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class ListingService : IListingService
 {
     private readonly IUnitOfWork _uow;
-    private const string StatusActive = "Active";
-
     public ListingService(IUnitOfWork uow)
     {
         _uow = uow;
@@ -68,7 +67,7 @@ public class ListingService : IListingService
         }
         else
         {
-            query = query.Where(l => l.Status == StatusActive);
+            query = query.Where(l => l.Status == ListingStatuses.Active);
         }
         if (!string.IsNullOrWhiteSpace(condition))
         {
@@ -134,7 +133,7 @@ public class ListingService : IListingService
 
         if (onlyActive)
         {
-            query = query.Where(l => l.Status == StatusActive);
+            query = query.Where(l => l.Status == ListingStatuses.Active);
         }
 
         var listing = await query.FirstOrDefaultAsync(cancellationToken);

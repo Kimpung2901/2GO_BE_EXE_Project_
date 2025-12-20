@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Listings;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
@@ -12,11 +13,6 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class ModeratorListingService : IModeratorListingService
 {
     private readonly IUnitOfWork _uow;
-    private const string StatusPendingReview = "PendingReview";
-    private const string StatusActive = "Active";
-    private const string StatusRejected = "Rejected";
-    private const string StatusFlagged = "Flagged";
-
     public ModeratorListingService(IUnitOfWork uow)
     {
         _uow = uow;
@@ -108,12 +104,12 @@ public class ModeratorListingService : IModeratorListingService
         var listing = await _uow.Listings.GetByIdAsync(listingId);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
 
-        if (!string.Equals(listing.Status, StatusPendingReview, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.PendingReview, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Listing can only be approved when status is PendingReview.");
         }
 
-        listing.Status = StatusActive;
+        listing.Status = ListingStatuses.Active;
         listing.UpdatedAt = DateTime.UtcNow;
         _uow.Listings.Update(listing);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -127,12 +123,12 @@ public class ModeratorListingService : IModeratorListingService
         var listing = await _uow.Listings.GetByIdAsync(listingId);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
 
-        if (!string.Equals(listing.Status, StatusPendingReview, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.PendingReview, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Listing can only be rejected when status is PendingReview.");
         }
 
-        listing.Status = StatusRejected;
+        listing.Status = ListingStatuses.Rejected;
         listing.UpdatedAt = DateTime.UtcNow;
         _uow.Listings.Update(listing);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -146,12 +142,12 @@ public class ModeratorListingService : IModeratorListingService
         var listing = await _uow.Listings.GetByIdAsync(listingId);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
 
-        if (!string.Equals(listing.Status, StatusActive, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.Active, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Listing can only be flagged when status is Active.");
         }
 
-        listing.Status = StatusFlagged;
+        listing.Status = ListingStatuses.Flagged;
         listing.UpdatedAt = DateTime.UtcNow;
         _uow.Listings.Update(listing);
         await _uow.SaveChangesAsync(cancellationToken);

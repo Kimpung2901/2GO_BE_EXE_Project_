@@ -10,3 +10,31 @@ public record OrderResponse(
     decimal? TotalAmount,
     string? Status,
     DateTime? CreatedAt);
+
+public record OrderListItem(
+    long OrderId,
+    long ListingId,
+    long BuyerId,
+    long SellerId,
+    decimal? TotalAmount,
+    string? Status,
+    DateTime? CreatedAt,
+    string? ListingTitle,
+    decimal? ListingPrice);
+
+public record OrderListResponse(int Total, IReadOnlyList<OrderListItem> Items);
+
+public record OrderDetailResponse(
+    long OrderId,
+    long ListingId,
+    long BuyerId,
+    long SellerId,
+    decimal? TotalAmount,
+    string? Status,
+    DateTime? CreatedAt,
+    string? ListingTitle,
+    decimal? ListingPrice,
+    string? BuyerEmail,
+    string? BuyerPhone,
+    string? SellerEmail,
+    string? SellerPhone);

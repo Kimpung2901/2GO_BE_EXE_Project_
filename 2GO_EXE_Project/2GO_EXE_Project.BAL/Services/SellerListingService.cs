@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.DTOs.Listings;
 using _2GO_EXE_Project.BAL.Interfaces;
@@ -11,12 +12,6 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class SellerListingService : ISellerListingService
 {
     private readonly IUnitOfWork _uow;
-    private const string StatusDraft = "Draft";
-    private const string StatusPendingReview = "PendingReview";
-    private const string StatusRejected = "Rejected";
-    private const string StatusActive = "Active";
-    private const string StatusArchived = "Archived";
-
     public SellerListingService(IUnitOfWork uow)
     {
         _uow = uow;
@@ -163,7 +158,7 @@ public class SellerListingService : ISellerListingService
             Dimensions = request.Dimensions,
             Weight = request.Weight,
             Brand = request.Brand,
-            Status = StatusDraft,
+            Status = ListingStatuses.Draft,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -193,8 +188,8 @@ public class SellerListingService : ISellerListingService
             .FirstOrDefaultAsync(l => l.ListingId == listingId && l.SellerId == sellerId, cancellationToken);
 
         if (listing == null) return null;
-        if (!string.Equals(listing.Status, StatusDraft, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(listing.Status, StatusRejected, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.Draft, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(listing.Status, ListingStatuses.Rejected, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Listing can only be updated when status is Draft or Rejected.");
         }
@@ -234,8 +229,8 @@ public class SellerListingService : ISellerListingService
             .FirstOrDefaultAsync(l => l.ListingId == listingId && l.SellerId == sellerId, cancellationToken);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
 
-        if (!string.Equals(listing.Status, StatusDraft, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(listing.Status, StatusRejected, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.Draft, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(listing.Status, ListingStatuses.Rejected, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Listing can only be submitted when status is Draft or Rejected.");
         }
@@ -268,7 +263,7 @@ public class SellerListingService : ISellerListingService
             _uow.ListingImages.Update(images[0]);
         }
 
-        listing.Status = StatusPendingReview;
+        listing.Status = ListingStatuses.PendingReview;
         listing.UpdatedAt = DateTime.UtcNow;
         _uow.Listings.Update(listing);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -282,12 +277,12 @@ public class SellerListingService : ISellerListingService
             .FirstOrDefaultAsync(l => l.ListingId == listingId && l.SellerId == sellerId, cancellationToken);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
 
-        if (!string.Equals(listing.Status, StatusActive, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.Active, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Listing can only be archived when status is Active.");
         }
 
-        listing.Status = StatusArchived;
+        listing.Status = ListingStatuses.Archived;
         listing.UpdatedAt = DateTime.UtcNow;
         _uow.Listings.Update(listing);
         await _uow.SaveChangesAsync(cancellationToken);

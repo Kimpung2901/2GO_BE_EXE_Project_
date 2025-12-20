@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Listings;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
@@ -12,16 +13,7 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class AdminListingService : IAdminListingService
 {
     private readonly IUnitOfWork _uow;
-    private static readonly HashSet<string> AllowedStatuses = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Draft",
-        "PendingReview",
-        "Active",
-        "Rejected",
-        "Archived",
-        "Flagged",
-        "Deleted"
-    };
+    private static readonly HashSet<string> AllowedStatuses = new(ListingStatuses.All, StringComparer.OrdinalIgnoreCase);
 
     public AdminListingService(IUnitOfWork uow)
     {
@@ -147,7 +139,7 @@ public class AdminListingService : IAdminListingService
         var listing = await _uow.Listings.GetByIdAsync(listingId);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
 
-        listing.Status = "Deleted";
+        listing.Status = ListingStatuses.Deleted;
         listing.UpdatedAt = DateTime.UtcNow;
         _uow.Listings.Update(listing);
         await _uow.SaveChangesAsync(cancellationToken);

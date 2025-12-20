@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.DTOs.Orders;
 using _2GO_EXE_Project.BAL.Interfaces;
@@ -11,11 +13,6 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class OrderService : IOrderService
 {
     private readonly IUnitOfWork _uow;
-    private const string StatusPending = "Pending";
-    private const string StatusCancelled = "Cancelled";
-    private const string StatusConfirmed = "Confirmed";
-    private const string StatusCompleted = "Completed";
-
     public OrderService(IUnitOfWork uow)
     {
         _uow = uow;
@@ -38,13 +35,26 @@ public class OrderService : IOrderService
         var buyerId = GetUserId(userPrincipal);
         var listing = await _uow.Listings.Query()
             .FirstOrDefaultAsync(l => l.ListingId == request.ListingId, cancellationToken);
-        if (listing == null || !string.Equals(listing.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        if (listing == null || !string.Equals(listing.Status, ListingStatuses.Active, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Listing not available.");
         }
         if (!listing.SellerId.HasValue)
         {
             throw new InvalidOperationException("Seller not found.");
+        }
+        if (listing.SellerId.Value == buyerId)
+        {
+            throw new InvalidOperationException("You cannot order your own listing.");
+        }
+
+        var hasActiveOrder = await _uow.Orders.Query()
+            .AnyAsync(o => o.ListingId == listing.ListingId &&
+                           (o.Status == OrderStatuses.Pending || o.Status == OrderStatuses.Confirmed || o.Status == OrderStatuses.Completed),
+                cancellationToken);
+        if (hasActiveOrder)
+        {
+            throw new InvalidOperationException("Listing already has an active order.");
         }
 
         var order = new Order
@@ -53,7 +63,7 @@ public class OrderService : IOrderService
             SellerId = listing.SellerId,
             ListingId = listing.ListingId,
             TotalAmount = listing.Price,
-            Status = StatusPending,
+            Status = OrderStatuses.Pending,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -69,7 +79,66 @@ public class OrderService : IOrderService
         await _uow.OrderItems.AddAsync(orderItem, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
+        await LogOrderActionAsync(buyerId, "OrderCreated", new { order.OrderId, order.ListingId, order.Status }, cancellationToken);
+
         return new OrderResponse(order.OrderId, listing.ListingId, buyerId, listing.SellerId.Value, order.TotalAmount, order.Status, order.CreatedAt);
+    }
+
+    public async Task<OrderListResponse> GetMyOrdersAsync(ClaimsPrincipal userPrincipal, int skip, int take, CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserId(userPrincipal);
+        var query = _uow.Orders.Query()
+            .Include(o => o.Listing)
+            .Where(o => o.BuyerId == userId || o.SellerId == userId);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(o => o.CreatedAt)
+            .Skip(skip < 0 ? 0 : skip)
+            .Take(take <= 0 ? 20 : Math.Min(take, 100))
+            .Select(o => new OrderListItem(
+                o.OrderId,
+                o.ListingId ?? 0,
+                o.BuyerId ?? 0,
+                o.SellerId ?? 0,
+                o.TotalAmount,
+                o.Status,
+                o.CreatedAt,
+                o.Listing != null ? o.Listing.Title : null,
+                o.Listing != null ? o.Listing.Price : null))
+            .ToListAsync(cancellationToken);
+
+        return new OrderListResponse(total, items);
+    }
+
+    public async Task<OrderDetailResponse?> GetByIdAsync(ClaimsPrincipal userPrincipal, long orderId, CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserId(userPrincipal);
+        var order = await _uow.Orders.Query()
+            .Include(o => o.Listing)
+            .Include(o => o.Buyer)
+            .Include(o => o.Seller)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
+        if (order == null) return null;
+        if (order.BuyerId != userId && order.SellerId != userId)
+        {
+            return null;
+        }
+
+        return new OrderDetailResponse(
+            order.OrderId,
+            order.ListingId ?? 0,
+            order.BuyerId ?? 0,
+            order.SellerId ?? 0,
+            order.TotalAmount,
+            order.Status,
+            order.CreatedAt,
+            order.Listing?.Title,
+            order.Listing?.Price,
+            order.Buyer?.Email,
+            order.Buyer?.Phone,
+            order.Seller?.Email,
+            order.Seller?.Phone);
     }
 
     public async Task<BasicResponse> CancelAsync(ClaimsPrincipal userPrincipal, long orderId, CancellationToken cancellationToken = default)
@@ -78,14 +147,15 @@ public class OrderService : IOrderService
         var order = await _uow.Orders.GetByIdAsync(orderId);
         if (order == null) return new BasicResponse(false, "Order not found.");
         if (order.BuyerId != userId) return new BasicResponse(false, "Not allowed.");
-        if (!string.Equals(order.Status, StatusPending, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Only pending orders can be cancelled.");
         }
 
-        order.Status = StatusCancelled;
+        order.Status = OrderStatuses.Cancelled;
         _uow.Orders.Update(order);
         await _uow.SaveChangesAsync(cancellationToken);
+        await LogOrderActionAsync(userId, "OrderCancelled", new { order.OrderId, order.Status }, cancellationToken);
         return new BasicResponse(true, "Order cancelled.");
     }
 
@@ -95,14 +165,15 @@ public class OrderService : IOrderService
         var order = await _uow.Orders.GetByIdAsync(orderId);
         if (order == null) return new BasicResponse(false, "Order not found.");
         if (order.SellerId != userId) return new BasicResponse(false, "Not allowed.");
-        if (!string.Equals(order.Status, StatusPending, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Only pending orders can be confirmed.");
         }
 
-        order.Status = StatusConfirmed;
+        order.Status = OrderStatuses.Confirmed;
         _uow.Orders.Update(order);
         await _uow.SaveChangesAsync(cancellationToken);
+        await LogOrderActionAsync(userId, "OrderConfirmed", new { order.OrderId, order.Status }, cancellationToken);
         return new BasicResponse(true, "Order confirmed.");
     }
 
@@ -112,14 +183,34 @@ public class OrderService : IOrderService
         var order = await _uow.Orders.GetByIdAsync(orderId);
         if (order == null) return new BasicResponse(false, "Order not found.");
         if (order.BuyerId != userId) return new BasicResponse(false, "Not allowed.");
-        if (!string.Equals(order.Status, StatusConfirmed, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(order.Status, OrderStatuses.Confirmed, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Only confirmed orders can be completed.");
         }
 
-        order.Status = StatusCompleted;
+        order.Status = OrderStatuses.Completed;
         _uow.Orders.Update(order);
         await _uow.SaveChangesAsync(cancellationToken);
+        await LogOrderActionAsync(userId, "OrderCompleted", new { order.OrderId, order.Status }, cancellationToken);
         return new BasicResponse(true, "Order completed.");
+    }
+
+    private async Task LogOrderActionAsync(long userId, string action, object details, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _uow.ActivityLogs.AddAsync(new _2GO_EXE_Project.DAL.Entities.ActivityLog
+            {
+                UserId = userId,
+                Action = action,
+                Details = JsonSerializer.Serialize(details),
+                CreatedAt = DateTime.UtcNow
+            }, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // ignore logging failures
+        }
     }
 }

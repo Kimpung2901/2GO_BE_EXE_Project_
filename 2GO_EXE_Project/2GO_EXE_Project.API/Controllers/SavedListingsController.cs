@@ -24,6 +24,13 @@ public class SavedListingsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{listingId:long}")]
+    public async Task<IActionResult> GetSavedStatus(long listingId, CancellationToken cancellationToken = default)
+    {
+        var result = await _savedListingService.GetSavedStatusAsync(User, listingId, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveListingRequest request, CancellationToken cancellationToken = default)
     {

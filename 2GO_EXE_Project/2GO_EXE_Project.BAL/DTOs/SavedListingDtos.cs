@@ -10,3 +10,5 @@ public record SavedListingItem(
     string? PrimaryImageUrl);
 
 public record SavedListingListResponse(int Total, IReadOnlyList<SavedListingItem> Items);
+
+public record SavedListingStatusResponse(long ListingId, bool IsSaved);

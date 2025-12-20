@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.DTOs.Payments;
 using _2GO_EXE_Project.BAL.Interfaces;
@@ -11,10 +13,12 @@ namespace _2GO_EXE_Project.BAL.Services;
 public class PaymentService : IPaymentService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IPaymentGateway _gateway;
 
-    public PaymentService(IUnitOfWork uow)
+    public PaymentService(IUnitOfWork uow, IPaymentGateway gateway)
     {
         _uow = uow;
+        _gateway = gateway;
     }
 
     private static long GetUserId(ClaimsPrincipal principal)
@@ -42,13 +46,15 @@ public class PaymentService : IPaymentService
             UserId = userId,
             Amount = request.Amount,
             Method = request.Method,
-            Status = "Pending",
+            Status = PaymentStatuses.Pending,
             ReferenceCode = Guid.NewGuid().ToString("N"),
             CreatedAt = DateTime.UtcNow
         };
 
         await _uow.Payments.AddAsync(payment, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await LogPaymentActionAsync(userId, "PaymentCreated", new { payment.PaymentId, payment.Amount, payment.Status }, cancellationToken);
 
         return new PaymentResponse(payment.PaymentId, payment.Amount, payment.Method, payment.Status, payment.ReferenceCode, payment.CreatedAt);
     }
@@ -65,6 +71,16 @@ public class PaymentService : IPaymentService
             return new BasicResponse(false, "Status is required.");
         }
 
+        if (!PaymentStatuses.All.Contains(request.Status, StringComparer.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Invalid payment status.");
+        }
+
+        if (!_gateway.VerifySignature(request, out var verifyMessage))
+        {
+            return new BasicResponse(false, verifyMessage);
+        }
+
         payment.Status = request.Status;
         _uow.Payments.Update(payment);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -78,6 +94,27 @@ public class PaymentService : IPaymentService
         await _uow.PaymentLogs.AddAsync(log, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
+        await LogPaymentActionAsync(userId, "PaymentVerified", new { payment.PaymentId, payment.Status }, cancellationToken);
+
         return new BasicResponse(true, "Payment updated.");
+    }
+
+    private async Task LogPaymentActionAsync(long userId, string action, object details, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _uow.ActivityLogs.AddAsync(new _2GO_EXE_Project.DAL.Entities.ActivityLog
+            {
+                UserId = userId,
+                Action = action,
+                Details = JsonSerializer.Serialize(details),
+                CreatedAt = DateTime.UtcNow
+            }, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // ignore logging failures
+        }
     }
 }

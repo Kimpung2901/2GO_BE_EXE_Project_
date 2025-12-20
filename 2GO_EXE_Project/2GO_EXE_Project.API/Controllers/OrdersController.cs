@@ -31,6 +31,21 @@ public class OrdersController : ControllerBase
         }
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetMyOrders([FromQuery] int skip = 0, [FromQuery] int take = 20, CancellationToken cancellationToken = default)
+    {
+        var result = await _orderService.GetMyOrdersAsync(User, skip, take, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("{orderId:long}")]
+    public async Task<IActionResult> GetById(long orderId, CancellationToken cancellationToken = default)
+    {
+        var result = await _orderService.GetByIdAsync(User, orderId, cancellationToken);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
     [HttpPut("{orderId:long}/cancel")]
     public async Task<IActionResult> Cancel(long orderId, CancellationToken cancellationToken = default)
     {

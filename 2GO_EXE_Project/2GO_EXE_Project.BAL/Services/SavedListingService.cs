@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.DTOs.Listings;
 using _2GO_EXE_Project.BAL.Interfaces;
@@ -55,13 +56,21 @@ public class SavedListingService : ISavedListingService
         return new SavedListingListResponse(total, items);
     }
 
+    public async Task<SavedListingStatusResponse> GetSavedStatusAsync(ClaimsPrincipal userPrincipal, long listingId, CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserId(userPrincipal);
+        var exists = await _uow.SavedListings.Query()
+            .AnyAsync(s => s.UserId == userId && s.ListingId == listingId, cancellationToken);
+        return new SavedListingStatusResponse(listingId, exists);
+    }
+
     public async Task<BasicResponse> SaveAsync(ClaimsPrincipal userPrincipal, SaveListingRequest request, CancellationToken cancellationToken = default)
     {
         var userId = GetUserId(userPrincipal);
         var listing = await _uow.Listings.Query()
             .FirstOrDefaultAsync(l => l.ListingId == request.ListingId, cancellationToken);
         if (listing == null) return new BasicResponse(false, "Listing not found.");
-        if (!string.Equals(listing.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(listing.Status, ListingStatuses.Active, StringComparison.OrdinalIgnoreCase))
         {
             return new BasicResponse(false, "Only active listings can be saved.");
         }
