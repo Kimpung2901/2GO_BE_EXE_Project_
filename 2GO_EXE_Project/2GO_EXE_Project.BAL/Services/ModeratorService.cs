@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text.Json;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
@@ -149,7 +150,16 @@ public class ModeratorService : IModeratorService
             return new BasicResponse(false, "Report not found.");
         }
 
-        report.Status = string.IsNullOrWhiteSpace(request.Status) ? "Resolved" : request.Status;
+        if (string.Equals(report.Status, ReportStatuses.Resolved, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(true, "Report already resolved.");
+        }
+        if (!string.Equals(report.Status, ReportStatuses.Pending, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Only pending reports can be resolved.");
+        }
+
+        report.Status = string.IsNullOrWhiteSpace(request.Status) ? ReportStatuses.Resolved : request.Status;
         _uow.Reports.Update(report);
         await _uow.SaveChangesAsync(cancellationToken);
 

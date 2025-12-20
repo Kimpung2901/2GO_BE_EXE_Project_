@@ -104,6 +104,15 @@ public class EscrowService : IEscrowService
         await _uow.EscrowTransactions.AddAsync(tx, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
+        if (string.Equals(request.Type, "Deposit", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase))
+        {
+            escrow.Status = EscrowStatuses.Funded;
+            escrow.UpdatedAt = DateTime.UtcNow;
+            _uow.EscrowContracts.Update(escrow);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+
         return new EscrowTransactionResponse(tx.TxId, tx.EscrowId ?? 0, tx.Type, tx.Method, tx.Amount, tx.Status, tx.CreatedAt);
     }
 
@@ -113,6 +122,15 @@ public class EscrowService : IEscrowService
         var escrow = await _uow.EscrowContracts.GetByIdAsync(escrowId);
         if (escrow == null) return new BasicResponse(false, "Escrow not found.");
         if (escrow.BuyerId != userId) return new BasicResponse(false, "Only buyer can release.");
+
+        if (string.Equals(escrow.Status, EscrowStatuses.Released, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(true, "Escrow already released.");
+        }
+        if (!string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Escrow must be funded before release.");
+        }
 
         escrow.Status = EscrowStatuses.Released;
         escrow.UpdatedAt = DateTime.UtcNow;

@@ -70,6 +70,11 @@ public class OrderService : IOrderService
         await _uow.Orders.AddAsync(order, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
+        listing.Status = ListingStatuses.Reserved;
+        listing.UpdatedAt = DateTime.UtcNow;
+        _uow.Listings.Update(listing);
+        await _uow.SaveChangesAsync(cancellationToken);
+
         var orderItem = new OrderItem
         {
             OrderId = order.OrderId,
@@ -149,12 +154,17 @@ public class OrderService : IOrderService
         if (order.BuyerId != userId) return new BasicResponse(false, "Not allowed.");
         if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
         {
+            if (string.Equals(order.Status, OrderStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+            {
+                return new BasicResponse(true, "Order already cancelled.");
+            }
             return new BasicResponse(false, "Only pending orders can be cancelled.");
         }
 
         order.Status = OrderStatuses.Cancelled;
         _uow.Orders.Update(order);
         await _uow.SaveChangesAsync(cancellationToken);
+        await RestoreListingIfReservedAsync(order.ListingId, cancellationToken);
         await LogOrderActionAsync(userId, "OrderCancelled", new { order.OrderId, order.Status }, cancellationToken);
         return new BasicResponse(true, "Order cancelled.");
     }
@@ -167,6 +177,10 @@ public class OrderService : IOrderService
         if (order.SellerId != userId) return new BasicResponse(false, "Not allowed.");
         if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
         {
+            if (string.Equals(order.Status, OrderStatuses.Confirmed, StringComparison.OrdinalIgnoreCase))
+            {
+                return new BasicResponse(true, "Order already confirmed.");
+            }
             return new BasicResponse(false, "Only pending orders can be confirmed.");
         }
 
@@ -185,14 +199,44 @@ public class OrderService : IOrderService
         if (order.BuyerId != userId) return new BasicResponse(false, "Not allowed.");
         if (!string.Equals(order.Status, OrderStatuses.Confirmed, StringComparison.OrdinalIgnoreCase))
         {
+            if (string.Equals(order.Status, OrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+            {
+                return new BasicResponse(true, "Order already completed.");
+            }
             return new BasicResponse(false, "Only confirmed orders can be completed.");
         }
 
         order.Status = OrderStatuses.Completed;
         _uow.Orders.Update(order);
         await _uow.SaveChangesAsync(cancellationToken);
+        await MarkListingSoldAsync(order.ListingId, cancellationToken);
         await LogOrderActionAsync(userId, "OrderCompleted", new { order.OrderId, order.Status }, cancellationToken);
         return new BasicResponse(true, "Order completed.");
+    }
+
+    private async Task RestoreListingIfReservedAsync(long? listingId, CancellationToken cancellationToken)
+    {
+        if (!listingId.HasValue) return;
+        var listing = await _uow.Listings.GetByIdAsync(listingId.Value);
+        if (listing == null) return;
+        if (string.Equals(listing.Status, ListingStatuses.Reserved, StringComparison.OrdinalIgnoreCase))
+        {
+            listing.Status = ListingStatuses.Active;
+            listing.UpdatedAt = DateTime.UtcNow;
+            _uow.Listings.Update(listing);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private async Task MarkListingSoldAsync(long? listingId, CancellationToken cancellationToken)
+    {
+        if (!listingId.HasValue) return;
+        var listing = await _uow.Listings.GetByIdAsync(listingId.Value);
+        if (listing == null) return;
+        listing.Status = ListingStatuses.Sold;
+        listing.UpdatedAt = DateTime.UtcNow;
+        _uow.Listings.Update(listing);
+        await _uow.SaveChangesAsync(cancellationToken);
     }
 
     private async Task LogOrderActionAsync(long userId, string action, object details, CancellationToken cancellationToken)

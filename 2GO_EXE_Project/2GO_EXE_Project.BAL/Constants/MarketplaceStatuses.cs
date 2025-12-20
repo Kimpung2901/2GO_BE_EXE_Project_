@@ -5,6 +5,8 @@ public static class ListingStatuses
     public const string Draft = "Draft";
     public const string PendingReview = "PendingReview";
     public const string Active = "Active";
+    public const string Reserved = "Reserved";
+    public const string Sold = "Sold";
     public const string Rejected = "Rejected";
     public const string Archived = "Archived";
     public const string Flagged = "Flagged";
@@ -15,6 +17,8 @@ public static class ListingStatuses
         Draft,
         PendingReview,
         Active,
+        Reserved,
+        Sold,
         Rejected,
         Archived,
         Flagged,

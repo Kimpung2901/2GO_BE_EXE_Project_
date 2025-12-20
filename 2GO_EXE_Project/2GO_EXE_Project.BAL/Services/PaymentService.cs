@@ -76,6 +76,16 @@ public class PaymentService : IPaymentService
             return new BasicResponse(false, "Invalid payment status.");
         }
 
+        if (string.Equals(payment.Status, request.Status, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(true, "Payment already in requested status.");
+        }
+
+        if (!IsPaymentTransitionAllowed(payment.Status, request.Status))
+        {
+            return new BasicResponse(false, $"Invalid payment status transition: {payment.Status} -> {request.Status}.");
+        }
+
         if (!_gateway.VerifySignature(request, out var verifyMessage))
         {
             return new BasicResponse(false, verifyMessage);
@@ -97,6 +107,21 @@ public class PaymentService : IPaymentService
         await LogPaymentActionAsync(userId, "PaymentVerified", new { payment.PaymentId, payment.Status }, cancellationToken);
 
         return new BasicResponse(true, "Payment updated.");
+    }
+
+    private static bool IsPaymentTransitionAllowed(string? current, string next)
+    {
+        if (string.IsNullOrWhiteSpace(current))
+        {
+            return true;
+        }
+        if (string.Equals(current, PaymentStatuses.Pending, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(next, PaymentStatuses.Paid, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(next, PaymentStatuses.Failed, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(next, PaymentStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
     }
 
     private async Task LogPaymentActionAsync(long userId, string action, object details, CancellationToken cancellationToken)

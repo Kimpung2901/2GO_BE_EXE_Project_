@@ -84,6 +84,22 @@ public class ShippingService : IShippingService
         var order = await _uow.Orders.GetByIdAsync(ship.OrderId ?? 0);
         if (order == null || order.SellerId != userId) return new BasicResponse(false, "Not allowed.");
 
+        if (string.IsNullOrWhiteSpace(request.Status))
+        {
+            return new BasicResponse(false, "Status is required.");
+        }
+
+        if (string.Equals(ship.Status, request.Status, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(true, "Shipping already in requested status.");
+        }
+
+        var current = ship.Status ?? ShippingStatuses.Requested;
+        if (!IsShippingTransitionAllowed(current, request.Status))
+        {
+            return new BasicResponse(false, $"Invalid shipping status transition: {current} -> {request.Status}.");
+        }
+
         ship.Status = request.Status;
         if (!string.IsNullOrWhiteSpace(request.TrackingCode))
         {
@@ -92,5 +108,20 @@ public class ShippingService : IShippingService
         _uow.ShippingRequests.Update(ship);
         await _uow.SaveChangesAsync(cancellationToken);
         return new BasicResponse(true, "Shipping updated.");
+    }
+
+    private static bool IsShippingTransitionAllowed(string current, string next)
+    {
+        if (string.Equals(current, ShippingStatuses.Requested, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(next, ShippingStatuses.InTransit, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(next, ShippingStatuses.Failed, StringComparison.OrdinalIgnoreCase);
+        }
+        if (string.Equals(current, ShippingStatuses.InTransit, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(next, ShippingStatuses.Delivered, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(next, ShippingStatuses.Failed, StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
     }
 }
