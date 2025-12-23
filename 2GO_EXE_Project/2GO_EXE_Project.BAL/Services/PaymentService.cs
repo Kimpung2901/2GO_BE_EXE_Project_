@@ -15,12 +15,14 @@ public class PaymentService : IPaymentService
     private readonly IUnitOfWork _uow;
     private readonly IPaymentGateway _gateway;
     private readonly IEscrowService _escrowService;
+    private readonly IMomoPaymentGateway _momoGateway;
 
-    public PaymentService(IUnitOfWork uow, IPaymentGateway gateway, IEscrowService escrowService)
+    public PaymentService(IUnitOfWork uow, IPaymentGateway gateway, IEscrowService escrowService, IMomoPaymentGateway momoGateway)
     {
         _uow = uow;
         _gateway = gateway;
         _escrowService = escrowService;
+        _momoGateway = momoGateway;
     }
 
     private static long GetUserId(ClaimsPrincipal principal)
@@ -56,7 +58,16 @@ public class PaymentService : IPaymentService
             .FirstOrDefaultAsync(p => p.OrderId == order.OrderId, cancellationToken);
         if (existing != null)
         {
-            return new PaymentResponse(existing.PaymentId, existing.Amount, existing.Method, existing.Status, existing.ReferenceCode, existing.CreatedAt);
+            string? existingPayUrl = null;
+            if (string.Equals(existing.Method, "MOMO", StringComparison.OrdinalIgnoreCase))
+            {
+                var log = await _uow.PaymentLogs.Query()
+                    .Where(l => l.PaymentId == existing.PaymentId && l.RawResponse != null)
+                    .OrderByDescending(l => l.LogId)
+                    .FirstOrDefaultAsync(cancellationToken);
+                existingPayUrl = ExtractPayUrl(log?.RawResponse);
+            }
+            return new PaymentResponse(existing.PaymentId, existing.Amount, existing.Method, existing.Status, existing.ReferenceCode, existing.CreatedAt, existingPayUrl);
         }
 
         var payment = new Payment
@@ -73,9 +84,32 @@ public class PaymentService : IPaymentService
         await _uow.Payments.AddAsync(payment, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
+        string? payUrl = null;
+        if (string.Equals(payment.Method, "MOMO", StringComparison.OrdinalIgnoreCase))
+        {
+            var momoAmount = Convert.ToInt64(decimal.Round(payment.Amount ?? 0, 0));
+            var momoResponse = await _momoGateway.CreatePaymentAsync(
+                new MomoCreatePaymentRequest(payment.ReferenceCode!, momoAmount, $"Payment for order {payment.OrderId}"),
+                cancellationToken);
+
+            if (momoResponse.ResultCode != 0 || string.IsNullOrWhiteSpace(momoResponse.PayUrl))
+            {
+                throw new InvalidOperationException($"MoMo payment creation failed: {momoResponse.Message ?? "Unknown error"}");
+            }
+
+            payUrl = momoResponse.PayUrl;
+            await _uow.PaymentLogs.AddAsync(new PaymentLog
+            {
+                PaymentId = payment.PaymentId,
+                RawResponse = momoResponse.RawResponse,
+                CreatedAt = DateTime.UtcNow
+            }, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+
         await LogPaymentActionAsync(userId, "PaymentCreated", new { payment.PaymentId, payment.Amount, payment.Status }, cancellationToken);
 
-        return new PaymentResponse(payment.PaymentId, payment.Amount, payment.Method, payment.Status, payment.ReferenceCode, payment.CreatedAt);
+        return new PaymentResponse(payment.PaymentId, payment.Amount, payment.Method, payment.Status, payment.ReferenceCode, payment.CreatedAt, payUrl);
     }
 
     public async Task<BasicResponse> VerifyAsync(ClaimsPrincipal userPrincipal, long paymentId, VerifyPaymentRequest request, CancellationToken cancellationToken = default)
@@ -129,6 +163,58 @@ public class PaymentService : IPaymentService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await LogPaymentActionAsync(userId, "PaymentVerified", new { payment.PaymentId, payment.Status }, cancellationToken);
+        await UpdateOrderByPaymentAsync(payment, cancellationToken);
+
+        return new BasicResponse(true, "Payment updated.");
+    }
+
+    public async Task<BasicResponse> HandleMomoIpnAsync(MomoIpnRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.OrderId))
+        {
+            return new BasicResponse(false, "OrderId is required.");
+        }
+        if (!_momoGateway.VerifyIpnSignature(request, out var verifyMessage))
+        {
+            return new BasicResponse(false, verifyMessage);
+        }
+
+        var payment = await _uow.Payments.Query()
+            .FirstOrDefaultAsync(p => p.ReferenceCode == request.OrderId, cancellationToken);
+        if (payment == null) return new BasicResponse(false, "Payment not found.");
+
+        if (payment.Amount.HasValue && payment.Amount.Value != request.Amount)
+        {
+            return new BasicResponse(false, "Amount mismatch.");
+        }
+
+        var nextStatus = request.ResultCode == 0
+            ? PaymentStatuses.Paid
+            : request.ResultCode == 1006
+                ? PaymentStatuses.Cancelled
+                : PaymentStatuses.Failed;
+
+        if (string.Equals(payment.Status, nextStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(true, "Payment already in requested status.");
+        }
+        if (!IsPaymentTransitionAllowed(payment.Status, nextStatus))
+        {
+            return new BasicResponse(false, $"Invalid payment status transition: {payment.Status} -> {nextStatus}.");
+        }
+
+        payment.Status = nextStatus;
+        _uow.Payments.Update(payment);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        await _uow.PaymentLogs.AddAsync(new PaymentLog
+        {
+            PaymentId = payment.PaymentId,
+            RawResponse = JsonSerializer.Serialize(request),
+            CreatedAt = DateTime.UtcNow
+        }, cancellationToken);
+        await _uow.SaveChangesAsync(cancellationToken);
+
         await UpdateOrderByPaymentAsync(payment, cancellationToken);
 
         return new BasicResponse(true, "Payment updated.");
@@ -204,6 +290,20 @@ public class PaymentService : IPaymentService
         catch
         {
             // ignore logging failures
+        }
+    }
+
+    private static string? ExtractPayUrl(string? rawResponse)
+    {
+        if (string.IsNullOrWhiteSpace(rawResponse)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(rawResponse);
+            return doc.RootElement.TryGetProperty("payUrl", out var payUrlProp) ? payUrlProp.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 }

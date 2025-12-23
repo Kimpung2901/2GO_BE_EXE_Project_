@@ -38,4 +38,13 @@ public class PaymentsController : ControllerBase
         if (!result.Success) return BadRequest(result.Message);
         return Ok(result);
     }
+
+    [HttpPost("momo/ipn")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MomoIpn([FromBody] MomoIpnRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await _paymentService.HandleMomoIpnAsync(request, cancellationToken);
+        if (!result.Success) return BadRequest(result.Message);
+        return Ok(result);
+    }
 }

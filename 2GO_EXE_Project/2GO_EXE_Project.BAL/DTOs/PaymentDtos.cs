@@ -10,4 +10,5 @@ public record PaymentResponse(
     string? Method,
     string? Status,
     string? ReferenceCode,
-    DateTime? CreatedAt);
+    DateTime? CreatedAt,
+    string? PayUrl);
