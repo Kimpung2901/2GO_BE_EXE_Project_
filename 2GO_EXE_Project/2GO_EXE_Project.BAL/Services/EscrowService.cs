@@ -87,7 +87,8 @@ public class EscrowService : IEscrowService
         {
             return escrow;
         }
-        if (!string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(escrow.Status, EscrowStatuses.Holding, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -107,6 +108,10 @@ public class EscrowService : IEscrowService
         if (string.Equals(escrow.Status, EscrowStatuses.Refunded, StringComparison.OrdinalIgnoreCase))
         {
             return escrow;
+        }
+        if (string.Equals(escrow.Status, EscrowStatuses.Released, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
         }
 
         escrow.Status = EscrowStatuses.Refunded;

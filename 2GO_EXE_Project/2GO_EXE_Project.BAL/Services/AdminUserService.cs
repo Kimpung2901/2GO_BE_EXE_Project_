@@ -117,6 +117,10 @@ public class AdminUserService : IAdminUserService
         string? salt = null;
         if (!string.IsNullOrEmpty(request.Password))
         {
+            if (!IsValidPassword(request.Password))
+            {
+                throw new InvalidOperationException("Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+            }
             passwordHash = _passwordHasher.HashPassword(request.Password, out salt);
         }
 
@@ -347,5 +351,13 @@ public class AdminUserService : IAdminUserService
         {
             _logger.LogWarning(ex, "Failed to log admin action {Action}", action);
         }
+    }
+
+    private static bool IsValidPassword(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 8) return false;
+        var hasLetter = value.Any(char.IsLetter);
+        var hasDigit = value.Any(char.IsDigit);
+        return hasLetter && hasDigit;
     }
 }

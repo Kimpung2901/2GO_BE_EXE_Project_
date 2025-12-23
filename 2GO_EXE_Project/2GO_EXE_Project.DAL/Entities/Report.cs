@@ -11,6 +11,8 @@ public partial class Report
     [Key]
     public long ReportId { get; set; }
 
+    public long? OrderId { get; set; }
+
     public long? ReporterId { get; set; }
 
     public long? TargetUserId { get; set; }
@@ -23,7 +25,12 @@ public partial class Report
     [Unicode(false)]
     public string? Status { get; set; }
 
+    public long? WaitingForUserId { get; set; }
+
     public DateTime? CreatedAt { get; set; }
+
+    [ForeignKey("OrderId")]
+    public virtual Order? Order { get; set; }
 
     [ForeignKey("ListingId")]
     [InverseProperty("Reports")]

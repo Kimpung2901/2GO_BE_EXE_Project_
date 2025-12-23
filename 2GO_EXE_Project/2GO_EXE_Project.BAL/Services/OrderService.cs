@@ -59,7 +59,7 @@ public class OrderService : IOrderService
 
         var hasActiveOrder = await _uow.Orders.Query()
             .AnyAsync(o => o.ListingId == listing.ListingId &&
-                           (o.Status == OrderStatuses.Pending || o.Status == OrderStatuses.Confirmed || o.Status == OrderStatuses.Completed),
+                           (o.Status == OrderStatuses.Pending || o.Status == OrderStatuses.Confirmed || o.Status == OrderStatuses.Completed || o.Status == OrderStatuses.Disputed),
                 cancellationToken);
         if (hasActiveOrder)
         {
@@ -181,6 +181,10 @@ public class OrderService : IOrderService
         var order = await _uow.Orders.GetByIdAsync(orderId);
         if (order == null) return new BasicResponse(false, "Order not found.");
         if (order.BuyerId != userId) return new BasicResponse(false, "Not allowed.");
+        if (string.Equals(order.Status, OrderStatuses.Disputed, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Order is in dispute.");
+        }
         if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
         {
             if (string.Equals(order.Status, OrderStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
@@ -206,6 +210,10 @@ public class OrderService : IOrderService
         var order = await _uow.Orders.GetByIdAsync(orderId);
         if (order == null) return new BasicResponse(false, "Order not found.");
         if (order.SellerId != userId) return new BasicResponse(false, "Not allowed.");
+        if (string.Equals(order.Status, OrderStatuses.Disputed, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Order is in dispute.");
+        }
         if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
         {
             if (string.Equals(order.Status, OrderStatuses.Confirmed, StringComparison.OrdinalIgnoreCase))
@@ -234,6 +242,10 @@ public class OrderService : IOrderService
         var order = await _uow.Orders.GetByIdAsync(orderId);
         if (order == null) return new BasicResponse(false, "Order not found.");
         if (order.BuyerId != userId) return new BasicResponse(false, "Not allowed.");
+        if (string.Equals(order.Status, OrderStatuses.Disputed, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Order is in dispute.");
+        }
         if (!string.Equals(order.Status, OrderStatuses.Confirmed, StringComparison.OrdinalIgnoreCase))
         {
             if (string.Equals(order.Status, OrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))

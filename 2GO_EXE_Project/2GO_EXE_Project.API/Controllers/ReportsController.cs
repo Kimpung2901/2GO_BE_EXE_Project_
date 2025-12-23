@@ -37,4 +37,12 @@ public class ReportsController : ControllerBase
         var result = await _reportService.GetMyReportsAsync(User, skip, take, cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("{reportId:long}/reply")]
+    public async Task<IActionResult> Reply(long reportId, [FromBody] ReplyReportRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await _reportService.ReplyAsync(User, reportId, request, cancellationToken);
+        if (!result.Success) return BadRequest(result.Message);
+        return Ok(result);
+    }
 }

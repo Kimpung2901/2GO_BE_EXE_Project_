@@ -32,6 +32,7 @@ public static class OrderStatuses
     public const string Confirmed = "Confirmed";
     public const string Completed = "Completed";
     public const string Cancelled = "Cancelled";
+    public const string Disputed = "Disputed";
 }
 
 public static class PaymentStatuses
@@ -54,6 +55,7 @@ public static class EscrowStatuses
 {
     public const string Pending = "Pending";
     public const string Funded = "Funded";
+    public const string Holding = "Holding";
     public const string Released = "Released";
     public const string Cancelled = "Cancelled";
     public const string Refunded = "Refunded";
@@ -69,6 +71,9 @@ public static class ShippingStatuses
 
 public static class ReportStatuses
 {
-    public const string Pending = "Pending";
+    public const string Open = "Open";
+    public const string InReview = "InReview";
+    public const string WaitingOtherParty = "WaitingOtherParty";
     public const string Resolved = "Resolved";
+    public const string Rejected = "Rejected";
 }

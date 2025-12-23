@@ -54,6 +54,10 @@ public class AuthService : IAuthService
         {
             throw new ArgumentException("Email or phone is required.");
         }
+        if (!IsValidPassword(request.Password))
+        {
+            throw new InvalidOperationException("Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+        }
 
         var exists = await _uow.Users.Query()
             .AsNoTracking()
@@ -470,6 +474,10 @@ public class AuthService : IAuthService
 
     public async Task<BasicResponse> ChangePasswordAsync(ClaimsPrincipal userPrincipal, ChangePasswordRequest request, CancellationToken cancellationToken = default)
     {
+        if (!IsValidPassword(request.NewPassword))
+        {
+            return new BasicResponse(false, "Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+        }
         var sub = userPrincipal.FindFirst("sub")?.Value
                   ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
                   ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
@@ -681,6 +689,10 @@ public class AuthService : IAuthService
         {
             return new BasicResponse(false, "Invalid code.");
         }
+        if (!IsValidPassword(request.NewPassword))
+        {
+            return new BasicResponse(false, "Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+        }
 
         var codeEntity = await _uow.VerificationCodes.Query()
             .FirstOrDefaultAsync(c =>
@@ -718,6 +730,14 @@ public class AuthService : IAuthService
         await CleanupExpiredVerificationCodesAsync(user.UserId, cancellationToken);
 
         return new BasicResponse(true, "Password reset successful.");
+    }
+
+    private static bool IsValidPassword(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 8) return false;
+        var hasLetter = value.Any(char.IsLetter);
+        var hasDigit = value.Any(char.IsDigit);
+        return hasLetter && hasDigit;
     }
 
     private async Task<string> CreateVerificationCodeAsync(long userId, string purpose, CancellationToken cancellationToken)

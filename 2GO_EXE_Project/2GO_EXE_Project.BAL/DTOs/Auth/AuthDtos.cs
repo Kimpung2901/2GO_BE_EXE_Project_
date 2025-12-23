@@ -49,7 +49,7 @@ public record AdminUserListResponse(int Total, IReadOnlyList<AdminUserSummary> I
 public record UpdateAvatarRequest(string AvatarUrl);
 public record UpdateAddressRequest(string? Address, int? CityId, int? DistrictId, int? WardId);
 public record BanUserRequest(string Reason, int? DurationDays);
-public record ReportSummary(long ReportId, long? ReporterId, long? TargetUserId, long? ListingId, string? Reason, string? Status, DateTime? CreatedAt);
-public record ReportDetail(long ReportId, long? ReporterId, long? TargetUserId, long? ListingId, string? Reason, string? Status, DateTime? CreatedAt);
-public record ReportListResponse(int Total, IReadOnlyList<ReportSummary> Items);
-public record ResolveReportRequest(string? Status, string? Note);
+public record ReportSummary(long ReportId, long? OrderId, long? ReporterId, long? TargetUserId, long? ListingId, string? Reason, string? Status, long? WaitingForUserId, DateTime? CreatedAt);
+public record ReportDetail(long ReportId, long? OrderId, long? ReporterId, long? TargetUserId, long? ListingId, string? Reason, string? Status, long? WaitingForUserId, DateTime? CreatedAt);
+public record ModeratorReportListResponse(int Total, IReadOnlyList<ReportSummary> Items);
+public record ResolveReportRequest(string? Status, string? WaitingForRole, string? Decision, string? Note);

@@ -40,6 +40,10 @@ public class AuthController : ControllerBase
         {
             return BadRequest("Password is required.");
         }
+        if (!IsValidPassword(request.Password))
+        {
+            return BadRequest("Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+        }
 
         var result = await _authService.RegisterAsync(request, cancellationToken);
         return Ok(result);
@@ -144,6 +148,10 @@ public class AuthController : ControllerBase
         {
             return BadRequest("New password is required.");
         }
+        if (!IsValidPassword(request.NewPassword))
+        {
+            return BadRequest("Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+        }
         if (string.IsNullOrWhiteSpace(request.Email))
         {
             return BadRequest("Email is required.");
@@ -168,6 +176,14 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(value)) return false;
         const string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
         return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase);
+    }
+
+    private static bool IsValidPassword(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 8) return false;
+        var hasLetter = value.Any(char.IsLetter);
+        var hasDigit = value.Any(char.IsDigit);
+        return hasLetter && hasDigit;
     }
 
     private static bool IsValidPhone(string? value)
