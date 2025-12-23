@@ -14,11 +14,13 @@ public class PaymentService : IPaymentService
 {
     private readonly IUnitOfWork _uow;
     private readonly IPaymentGateway _gateway;
+    private readonly IEscrowService _escrowService;
 
-    public PaymentService(IUnitOfWork uow, IPaymentGateway gateway)
+    public PaymentService(IUnitOfWork uow, IPaymentGateway gateway, IEscrowService escrowService)
     {
         _uow = uow;
         _gateway = gateway;
+        _escrowService = escrowService;
     }
 
     private static long GetUserId(ClaimsPrincipal principal)
@@ -36,16 +38,33 @@ public class PaymentService : IPaymentService
     public async Task<PaymentResponse> CreateAsync(ClaimsPrincipal userPrincipal, CreatePaymentRequest request, CancellationToken cancellationToken = default)
     {
         var userId = GetUserId(userPrincipal);
-        if (request.Amount <= 0)
+        var order = await _uow.Orders.GetByIdAsync(request.OrderId);
+        if (order == null)
         {
-            throw new InvalidOperationException("Amount must be greater than 0.");
+            throw new InvalidOperationException("Order not found.");
+        }
+        if (order.BuyerId != userId)
+        {
+            throw new InvalidOperationException("Not allowed.");
+        }
+        if (!string.Equals(order.PaymentMethod, request.Method, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Payment method does not match the order.");
+        }
+
+        var existing = await _uow.Payments.Query()
+            .FirstOrDefaultAsync(p => p.OrderId == order.OrderId, cancellationToken);
+        if (existing != null)
+        {
+            return new PaymentResponse(existing.PaymentId, existing.Amount, existing.Method, existing.Status, existing.ReferenceCode, existing.CreatedAt);
         }
 
         var payment = new Payment
         {
             UserId = userId,
-            Amount = request.Amount,
-            Method = request.Method,
+            OrderId = order.OrderId,
+            Amount = order.TotalAmount,
+            Method = order.PaymentMethod,
             Status = PaymentStatuses.Pending,
             ReferenceCode = Guid.NewGuid().ToString("N"),
             CreatedAt = DateTime.UtcNow
@@ -86,6 +105,11 @@ public class PaymentService : IPaymentService
             return new BasicResponse(false, $"Invalid payment status transition: {payment.Status} -> {request.Status}.");
         }
 
+        if (string.Equals(payment.Method, "COD", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "COD payments are verified when order is completed.");
+        }
+
         if (!_gateway.VerifySignature(request, out var verifyMessage))
         {
             return new BasicResponse(false, verifyMessage);
@@ -105,6 +129,7 @@ public class PaymentService : IPaymentService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await LogPaymentActionAsync(userId, "PaymentVerified", new { payment.PaymentId, payment.Status }, cancellationToken);
+        await UpdateOrderByPaymentAsync(payment, cancellationToken);
 
         return new BasicResponse(true, "Payment updated.");
     }
@@ -122,6 +147,45 @@ public class PaymentService : IPaymentService
                    string.Equals(next, PaymentStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
         }
         return false;
+    }
+
+    private async Task UpdateOrderByPaymentAsync(Payment payment, CancellationToken cancellationToken)
+    {
+        if (!payment.OrderId.HasValue) return;
+        var order = await _uow.Orders.GetByIdAsync(payment.OrderId.Value);
+        if (order == null) return;
+        if (!string.Equals(order.Status, OrderStatuses.Pending, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (string.Equals(payment.Status, PaymentStatuses.Paid, StringComparison.OrdinalIgnoreCase))
+        {
+            order.Status = OrderStatuses.Confirmed;
+            _uow.Orders.Update(order);
+            await _uow.SaveChangesAsync(cancellationToken);
+            await _escrowService.FundForOrderAsync(order.OrderId, payment.PaymentId, cancellationToken);
+        }
+        else if (string.Equals(payment.Status, PaymentStatuses.Failed, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(payment.Status, PaymentStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            order.Status = OrderStatuses.Cancelled;
+            _uow.Orders.Update(order);
+            await _uow.SaveChangesAsync(cancellationToken);
+            await _escrowService.RefundForOrderAsync(order.OrderId, cancellationToken);
+
+            if (order.ListingId.HasValue)
+            {
+                var listing = await _uow.Listings.GetByIdAsync(order.ListingId.Value);
+                if (listing != null && string.Equals(listing.Status, ListingStatuses.Reserved, StringComparison.OrdinalIgnoreCase))
+                {
+                    listing.Status = ListingStatuses.Active;
+                    listing.UpdatedAt = DateTime.UtcNow;
+                    _uow.Listings.Update(listing);
+                    await _uow.SaveChangesAsync(cancellationToken);
+                }
+            }
+        }
     }
 
     private async Task LogPaymentActionAsync(long userId, string action, object details, CancellationToken cancellationToken)

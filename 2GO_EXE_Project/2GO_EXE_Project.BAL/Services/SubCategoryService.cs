@@ -29,11 +29,10 @@ public class SubCategoryService : ISubCategoryService
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query
-            .OrderBy(sc => sc.SortOrder)
-            .ThenBy(sc => sc.Name)
+            .OrderBy(sc => sc.Name)
             .Skip(skip < 0 ? 0 : skip)
             .Take(take <= 0 ? 20 : take)
-            .Select(sc => new SubCategoryResponse(sc.SubCategoryId, sc.CategoryId ?? 0, sc.Name, sc.IsActive, sc.SortOrder))
+            .Select(sc => new SubCategoryResponse(sc.SubCategoryId, sc.CategoryId ?? 0, sc.Name, sc.IsActive))
             .ToListAsync(cancellationToken);
 
         return new SubCategoryListResponse(total, items);
@@ -49,11 +48,10 @@ public class SubCategoryService : ISubCategoryService
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query
-            .OrderBy(sc => sc.SortOrder)
-            .ThenBy(sc => sc.Name)
+            .OrderBy(sc => sc.Name)
             .Skip(skip < 0 ? 0 : skip)
             .Take(take <= 0 ? 20 : take)
-            .Select(sc => new SubCategoryResponse(sc.SubCategoryId, sc.CategoryId ?? 0, sc.Name, sc.IsActive, sc.SortOrder))
+            .Select(sc => new SubCategoryResponse(sc.SubCategoryId, sc.CategoryId ?? 0, sc.Name, sc.IsActive))
             .ToListAsync(cancellationToken);
 
         return new SubCategoryListResponse(total, items);
@@ -64,7 +62,7 @@ public class SubCategoryService : ISubCategoryService
         var sub = await _uow.SubCategories.Query()
             .FirstOrDefaultAsync(sc => sc.SubCategoryId == id && (!onlyActive || sc.IsActive), cancellationToken);
         if (sub == null) return null;
-        return new SubCategoryResponse(sub.SubCategoryId, sub.CategoryId ?? 0, sub.Name, sub.IsActive, sub.SortOrder);
+        return new SubCategoryResponse(sub.SubCategoryId, sub.CategoryId ?? 0, sub.Name, sub.IsActive);
     }
 
     public async Task<SubCategoryResponse> CreateAsync(int categoryId, CreateSubCategoryRequest request, CancellationToken cancellationToken = default)
@@ -79,12 +77,11 @@ public class SubCategoryService : ISubCategoryService
         {
             CategoryId = categoryId,
             Name = request.Name,
-            IsActive = request.IsActive,
-            SortOrder = request.SortOrder
+            IsActive = request.IsActive
         };
         await _uow.SubCategories.AddAsync(entity, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
-        return new SubCategoryResponse(entity.SubCategoryId, entity.CategoryId ?? 0, entity.Name, entity.IsActive, entity.SortOrder);
+        return new SubCategoryResponse(entity.SubCategoryId, entity.CategoryId ?? 0, entity.Name, entity.IsActive);
     }
 
     public async Task<SubCategoryResponse?> UpdateAsync(int id, UpdateSubCategoryRequest request, CancellationToken cancellationToken = default)
@@ -97,14 +94,10 @@ public class SubCategoryService : ISubCategoryService
         {
             entity.IsActive = request.IsActive.Value;
         }
-        if (request.SortOrder.HasValue)
-        {
-            entity.SortOrder = request.SortOrder.Value;
-        }
 
         _uow.SubCategories.Update(entity);
         await _uow.SaveChangesAsync(cancellationToken);
-        return new SubCategoryResponse(entity.SubCategoryId, entity.CategoryId ?? 0, entity.Name, entity.IsActive, entity.SortOrder);
+        return new SubCategoryResponse(entity.SubCategoryId, entity.CategoryId ?? 0, entity.Name, entity.IsActive);
     }
 
     public async Task<SubCategoryResponse?> UpdateStatusAsync(int id, UpdateSubCategoryStatusRequest request, CancellationToken cancellationToken = default)
@@ -114,7 +107,7 @@ public class SubCategoryService : ISubCategoryService
         entity.IsActive = request.IsActive;
         _uow.SubCategories.Update(entity);
         await _uow.SaveChangesAsync(cancellationToken);
-        return new SubCategoryResponse(entity.SubCategoryId, entity.CategoryId ?? 0, entity.Name, entity.IsActive, entity.SortOrder);
+        return new SubCategoryResponse(entity.SubCategoryId, entity.CategoryId ?? 0, entity.Name, entity.IsActive);
     }
 
     public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)

@@ -1,6 +1,6 @@
 namespace _2GO_EXE_Project.BAL.DTOs.Payments;
 
-public record CreatePaymentRequest(decimal Amount, string Method);
+public record CreatePaymentRequest(long OrderId, string Method);
 
 public record VerifyPaymentRequest(string Status, string? RawResponse, string? Signature);
 

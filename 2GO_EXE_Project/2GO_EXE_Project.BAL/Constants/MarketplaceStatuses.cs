@@ -56,6 +56,7 @@ public static class EscrowStatuses
     public const string Funded = "Funded";
     public const string Released = "Released";
     public const string Cancelled = "Cancelled";
+    public const string Refunded = "Refunded";
 }
 
 public static class ShippingStatuses

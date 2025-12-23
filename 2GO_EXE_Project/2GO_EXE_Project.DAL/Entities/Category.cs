@@ -21,8 +21,6 @@ public partial class Category
 
     public bool IsActive { get; set; } = true;
 
-    public int SortOrder { get; set; }
-
     [InverseProperty("Category")]
     public virtual ICollection<SubCategory> SubCategories { get; set; } = new List<SubCategory>();
 }

@@ -17,6 +17,10 @@ public partial class EscrowContract
 
     public long? ListingId { get; set; }
 
+    public long? OrderId { get; set; }
+
+    public long? PaymentId { get; set; }
+
     [Column(TypeName = "decimal(15, 2)")]
     public decimal? DepositAmount { get; set; }
 
@@ -42,10 +46,17 @@ public partial class EscrowContract
     [InverseProperty("EscrowContracts")]
     public virtual Listing? Listing { get; set; }
 
-    [InverseProperty("Escrow")]
-    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+    [ForeignKey("OrderId")]
+    [InverseProperty("EscrowContracts")]
+    public virtual Order? Order { get; set; }
 
+    [ForeignKey("PaymentId")]
+    [InverseProperty("EscrowContracts")]
+    public virtual Payment? Payment { get; set; }
     [ForeignKey("SellerId")]
     [InverseProperty("EscrowContractSellers")]
     public virtual User? Seller { get; set; }
+
+    [InverseProperty("Escrow")]
+    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }

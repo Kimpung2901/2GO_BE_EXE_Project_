@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using FirebaseAdmin;
 using FirebaseAdmin.Auth;
 using System.Security.Claims;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
@@ -69,7 +70,7 @@ public class AuthService : IAuthService
             Phone = request.Phone,
             PasswordHash = hash,
             Salt = salt,
-            Role = "User",
+            Role = UserRoles.User,
             Status = "Active",
             CreatedAt = DateTime.UtcNow
         };
@@ -110,6 +111,13 @@ public class AuthService : IAuthService
         if (user.Status != "Active")
         {
             throw new UnauthorizedAccessException("Account is not active.");
+        }
+
+        var normalizedRole = UserRoles.Normalize(user.Role);
+        if (!string.Equals(user.Role, normalizedRole, StringComparison.Ordinal))
+        {
+            user.Role = normalizedRole;
+            _uow.Users.Update(user);
         }
 
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash, user.Salt))
@@ -271,7 +279,7 @@ public class AuthService : IAuthService
             {
                 Phone = phone,
                 Email = email,
-                Role = "User",
+                Role = UserRoles.User,
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow
             };
@@ -284,6 +292,13 @@ public class AuthService : IAuthService
             if (user.Status != "Active")
             {
                 throw new UnauthorizedAccessException("Account is not active.");
+            }
+
+            var normalizedRole = UserRoles.Normalize(user.Role);
+            if (!string.Equals(user.Role, normalizedRole, StringComparison.Ordinal))
+            {
+                user.Role = normalizedRole;
+                _uow.Users.Update(user);
             }
         }
 

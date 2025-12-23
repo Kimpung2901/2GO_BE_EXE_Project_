@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using _2GO_EXE_Project.DAL.Context;
 
@@ -11,9 +12,11 @@ using _2GO_EXE_Project.DAL.Context;
 namespace _2GO_EXE_Project.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251223101054_RemoveCategorySubCategorySortOrder")]
+    partial class RemoveCategorySubCategorySortOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -321,12 +324,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
                     b.Property<long?>("ListingId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("OrderId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PaymentId")
-                        .HasColumnType("bigint");
-
                     b.Property<long?>("SellerId")
                         .HasColumnType("bigint");
 
@@ -347,10 +344,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
                     b.HasIndex("BuyerId");
 
                     b.HasIndex("ListingId");
-
-                    b.HasIndex("OrderId");
-
-                    b.HasIndex("PaymentId");
 
                     b.HasIndex("SellerId");
 
@@ -717,11 +710,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
                     b.Property<long?>("ListingId")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("PaymentMethod")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)");
-
                     b.Property<long?>("SellerId")
                         .HasColumnType("bigint");
 
@@ -795,9 +783,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(50)");
 
-                    b.Property<long?>("OrderId")
-                        .HasColumnType("bigint");
-
                     b.Property<string>("ReferenceCode")
                         .HasMaxLength(255)
                         .IsUnicode(false)
@@ -813,8 +798,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
 
                     b.HasKey("PaymentId")
                         .HasName("PK__Payments__9B556A383AF28E0A");
-
-                    b.HasIndex("OrderId");
 
                     b.HasIndex("UserId");
 
@@ -1540,14 +1523,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
                         .HasForeignKey("ListingId")
                         .HasConstraintName("FK_Escrow_Listing");
 
-                    b.HasOne("_2GO_EXE_Project.DAL.Entities.Order", "Order")
-                        .WithMany("EscrowContracts")
-                        .HasForeignKey("OrderId");
-
-                    b.HasOne("_2GO_EXE_Project.DAL.Entities.Payment", "Payment")
-                        .WithMany("EscrowContracts")
-                        .HasForeignKey("PaymentId");
-
                     b.HasOne("_2GO_EXE_Project.DAL.Entities.User", "Seller")
                         .WithMany("EscrowContractSellers")
                         .HasForeignKey("SellerId")
@@ -1556,10 +1531,6 @@ namespace _2GO_EXE_Project.DAL.Migrations
                     b.Navigation("Buyer");
 
                     b.Navigation("Listing");
-
-                    b.Navigation("Order");
-
-                    b.Navigation("Payment");
 
                     b.Navigation("Seller");
                 });
@@ -1743,16 +1714,10 @@ namespace _2GO_EXE_Project.DAL.Migrations
 
             modelBuilder.Entity("_2GO_EXE_Project.DAL.Entities.Payment", b =>
                 {
-                    b.HasOne("_2GO_EXE_Project.DAL.Entities.Order", "Order")
-                        .WithMany("Payments")
-                        .HasForeignKey("OrderId");
-
                     b.HasOne("_2GO_EXE_Project.DAL.Entities.User", "User")
                         .WithMany("Payments")
                         .HasForeignKey("UserId")
                         .HasConstraintName("FK_Payments_Users");
-
-                    b.Navigation("Order");
 
                     b.Navigation("User");
                 });
@@ -2013,19 +1978,13 @@ namespace _2GO_EXE_Project.DAL.Migrations
 
             modelBuilder.Entity("_2GO_EXE_Project.DAL.Entities.Order", b =>
                 {
-                    b.Navigation("EscrowContracts");
-
                     b.Navigation("OrderItems");
-
-                    b.Navigation("Payments");
 
                     b.Navigation("ShippingRequests");
                 });
 
             modelBuilder.Entity("_2GO_EXE_Project.DAL.Entities.Payment", b =>
                 {
-                    b.Navigation("EscrowContracts");
-
                     b.Navigation("PaymentLogs");
                 });
 

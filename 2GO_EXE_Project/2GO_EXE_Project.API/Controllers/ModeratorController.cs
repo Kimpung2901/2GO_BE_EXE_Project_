@@ -7,7 +7,7 @@ namespace _2GO_EXE_Project.API.Controllers;
 
 [ApiController]
 [Route("api/mod")]
-[Authorize(Roles = "Admin,Manager,Moderator")]
+[Authorize(Roles = "Admin,Manager")]
 public class ModeratorController : ControllerBase
 {
     private readonly IModeratorService _modService;

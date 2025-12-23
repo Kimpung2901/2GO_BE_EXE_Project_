@@ -19,8 +19,6 @@ public partial class SubCategory
 
     public bool IsActive { get; set; } = true;
 
-    public int SortOrder { get; set; }
-
     [ForeignKey("CategoryId")]
     [InverseProperty("SubCategories")]
     public virtual Category? Category { get; set; }

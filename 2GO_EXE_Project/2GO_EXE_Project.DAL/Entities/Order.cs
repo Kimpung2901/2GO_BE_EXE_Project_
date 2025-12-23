@@ -24,6 +24,10 @@ public partial class Order
 
     [StringLength(50)]
     [Unicode(false)]
+    public string? PaymentMethod { get; set; }
+
+    [StringLength(50)]
+    [Unicode(false)]
     public string? Status { get; set; }
 
     public DateTime? CreatedAt { get; set; }
@@ -49,4 +53,10 @@ public partial class Order
 
     [InverseProperty("Order")]
     public virtual ICollection<ShippingRequest> ShippingRequests { get; set; } = new List<ShippingRequest>();
+
+    [InverseProperty("Order")]
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
+    [InverseProperty("Order")]
+    public virtual ICollection<EscrowContract> EscrowContracts { get; set; } = new List<EscrowContract>();
 }

@@ -6,6 +6,7 @@ using _2GO_EXE_Project.DAL.Entities;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
 using System.Text.Json;
 using System.Security.Claims;
+using _2GO_EXE_Project.BAL.Constants;
 
 namespace _2GO_EXE_Project.BAL.Services;
 
@@ -100,6 +101,11 @@ public class AdminUserService : IAdminUserService
 
     public async Task<AdminUserDetail> CreateUserAsync(ClaimsPrincipal adminPrincipal, AdminCreateUserRequest request, CancellationToken cancellationToken = default)
     {
+        if (!UserRoles.All.Contains(request.Role ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Invalid role. Allowed: User, Manager, Admin.");
+        }
+        var normalizedRole = UserRoles.Normalize(request.Role);
         var exists = await _uow.Users.Query()
             .AnyAsync(u => (!string.IsNullOrEmpty(request.Email) && u.Email == request.Email) || (!string.IsNullOrEmpty(request.Phone) && u.Phone == request.Phone), cancellationToken);
         if (exists)
@@ -120,7 +126,7 @@ public class AdminUserService : IAdminUserService
             Phone = request.Phone,
             PasswordHash = passwordHash,
             Salt = salt,
-            Role = request.Role,
+            Role = normalizedRole,
             Status = request.Status,
             CreatedAt = DateTime.UtcNow
         };
@@ -152,7 +158,7 @@ public class AdminUserService : IAdminUserService
         await _uow.UserVerifications.AddAsync(verification, cancellationToken);
 
         await _uow.SaveChangesAsync(cancellationToken);
-        await LogAdminActionAsync(adminPrincipal, "CreateUser", new { TargetUserId = user.UserId, request.Email, request.Phone, request.Role, request.Status }, cancellationToken);
+        await LogAdminActionAsync(adminPrincipal, "CreateUser", new { TargetUserId = user.UserId, request.Email, request.Phone, Role = normalizedRole, request.Status }, cancellationToken);
 
         var profileInfo = new UserProfileInfo(profile.FullName, profile.DateOfBirth, profile.Gender, profile.AddressLine, profile.Bio, profile.AvatarUrl);
 
@@ -236,10 +242,15 @@ public class AdminUserService : IAdminUserService
             return new BasicResponse(false, "User not found.");
         }
 
-        user.Role = request.Role;
+        if (!UserRoles.All.Contains(request.Role ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+        {
+            return new BasicResponse(false, "Invalid role. Allowed: User, Manager, Admin.");
+        }
+        var normalizedRole = UserRoles.Normalize(request.Role);
+        user.Role = normalizedRole;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
-        await LogAdminActionAsync(adminPrincipal, "UpdateRole", new { TargetUserId = userId, NewRole = request.Role }, cancellationToken);
+        await LogAdminActionAsync(adminPrincipal, "UpdateRole", new { TargetUserId = userId, NewRole = normalizedRole }, cancellationToken);
         return new BasicResponse(true, "Role updated.");
     }
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using _2GO_EXE_Project.BAL.DTOs.Categories;
 using _2GO_EXE_Project.BAL.DTOs.SubCategories;
 using _2GO_EXE_Project.BAL.Interfaces;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace _2GO_EXE_Project.API.Controllers;
 
@@ -33,6 +34,10 @@ public class AdminCategoriesController : ControllerBase
     }
 
     [HttpPost("{categoryId:int}/subcategories")]
+    [SwaggerOperation(
+        Summary = "Create SUBCATEGORY under a CATEGORY",
+        Description = "Use this endpoint to create a subcategory for the given categoryId. Category is the parent, subcategory is the child."
+    )]
     public async Task<IActionResult> CreateSubCategory(int categoryId, [FromServices] ISubCategoryService subCategoryService, [FromBody] CreateSubCategoryRequest request, CancellationToken cancellationToken = default)
     {
         var result = await subCategoryService.CreateAsync(categoryId, request, cancellationToken);
@@ -48,6 +53,10 @@ public class AdminCategoriesController : ControllerBase
     }
 
     [HttpPost]
+    [SwaggerOperation(
+        Summary = "Create CATEGORY",
+        Description = "Use this endpoint to create a top-level category (not a subcategory)."
+    )]
     public async Task<IActionResult> Create([FromBody] CreateCategoryRequest request, CancellationToken cancellationToken)
     {
         var result = await _categoryService.CreateAsync(request, cancellationToken);
@@ -55,9 +64,25 @@ public class AdminCategoriesController : ControllerBase
     }
 
     [HttpPatch("{id:int}")]
+    [SwaggerOperation(
+        Summary = "Update CATEGORY by id",
+        Description = "Update a top-level category. Subcategories have their own endpoints."
+    )]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCategoryRequest request, CancellationToken cancellationToken)
     {
         var result = await _categoryService.UpdateAsync(id, request, cancellationToken);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
+    [HttpPut("{id:int}/status")]
+    [SwaggerOperation(
+        Summary = "Enable/disable CATEGORY",
+        Description = "Toggle category status. Subcategory status is managed in AdminSubCategories."
+    )]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateCategoryStatusRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _categoryService.UpdateStatusAsync(id, request, cancellationToken);
         if (result == null) return NotFound();
         return Ok(result);
     }

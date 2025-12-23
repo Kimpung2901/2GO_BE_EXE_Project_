@@ -1,13 +1,11 @@
-using System.Security.Claims;
-using _2GO_EXE_Project.BAL.DTOs.Auth;
-using _2GO_EXE_Project.BAL.DTOs.Escrow;
+using _2GO_EXE_Project.DAL.Entities;
 
 namespace _2GO_EXE_Project.BAL.Interfaces;
 
 public interface IEscrowService
 {
-    Task<EscrowResponse> CreateAsync(ClaimsPrincipal userPrincipal, CreateEscrowRequest request, CancellationToken cancellationToken = default);
-    Task<EscrowResponse?> GetByOrderAsync(ClaimsPrincipal userPrincipal, long orderId, CancellationToken cancellationToken = default);
-    Task<EscrowTransactionResponse> AddTransactionAsync(ClaimsPrincipal userPrincipal, long escrowId, CreateEscrowTransactionRequest request, CancellationToken cancellationToken = default);
-    Task<BasicResponse> ReleaseAsync(ClaimsPrincipal userPrincipal, long escrowId, CancellationToken cancellationToken = default);
+    Task<EscrowContract> EnsureForOrderAsync(Order order, long? paymentId, CancellationToken cancellationToken = default);
+    Task<EscrowContract?> FundForOrderAsync(long orderId, long? paymentId, CancellationToken cancellationToken = default);
+    Task<EscrowContract?> ReleaseForOrderAsync(long orderId, CancellationToken cancellationToken = default);
+    Task<EscrowContract?> RefundForOrderAsync(long orderId, CancellationToken cancellationToken = default);
 }

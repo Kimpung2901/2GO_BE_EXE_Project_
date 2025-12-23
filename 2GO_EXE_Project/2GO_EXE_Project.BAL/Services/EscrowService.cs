@@ -1,8 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using _2GO_EXE_Project.BAL.Constants;
-using _2GO_EXE_Project.BAL.DTOs.Auth;
-using _2GO_EXE_Project.BAL.DTOs.Escrow;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
@@ -18,32 +15,20 @@ public class EscrowService : IEscrowService
         _uow = uow;
     }
 
-    private static long GetUserId(ClaimsPrincipal principal)
+    public async Task<EscrowContract> EnsureForOrderAsync(Order order, long? paymentId, CancellationToken cancellationToken = default)
     {
-        var sub = principal.FindFirst("sub")?.Value
-                  ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                  ?? principal.FindFirst(ClaimTypes.Name)?.Value;
-        if (!long.TryParse(sub, out var id))
-        {
-            throw new UnauthorizedAccessException("Invalid user id in token.");
-        }
-        return id;
-    }
-
-    public async Task<EscrowResponse> CreateAsync(ClaimsPrincipal userPrincipal, CreateEscrowRequest request, CancellationToken cancellationToken = default)
-    {
-        var userId = GetUserId(userPrincipal);
-        var order = await _uow.Orders.Query()
-            .Include(o => o.Listing)
-            .FirstOrDefaultAsync(o => o.OrderId == request.OrderId, cancellationToken);
-        if (order == null) throw new InvalidOperationException("Order not found.");
-        if (order.BuyerId != userId) throw new InvalidOperationException("Only buyer can create escrow.");
-
         var existing = await _uow.EscrowContracts.Query()
-            .FirstOrDefaultAsync(e => e.Orders.Any(o => o.OrderId == order.OrderId), cancellationToken);
+            .FirstOrDefaultAsync(e => e.OrderId == order.OrderId, cancellationToken);
         if (existing != null)
         {
-            return new EscrowResponse(existing.EscrowId, order.OrderId, existing.BuyerId ?? 0, existing.SellerId ?? 0, existing.DepositAmount, existing.TotalAmount, existing.Status, existing.CreatedAt);
+            if (paymentId.HasValue && existing.PaymentId != paymentId)
+            {
+                existing.PaymentId = paymentId;
+                existing.UpdatedAt = DateTime.UtcNow;
+                _uow.EscrowContracts.Update(existing);
+                await _uow.SaveChangesAsync(cancellationToken);
+            }
+            return existing;
         }
 
         var escrow = new EscrowContract
@@ -51,7 +36,9 @@ public class EscrowService : IEscrowService
             BuyerId = order.BuyerId,
             SellerId = order.SellerId,
             ListingId = order.ListingId,
-            DepositAmount = request.DepositAmount,
+            OrderId = order.OrderId,
+            PaymentId = paymentId,
+            DepositAmount = order.TotalAmount,
             TotalAmount = order.TotalAmount,
             Status = EscrowStatuses.Pending,
             CreatedAt = DateTime.UtcNow,
@@ -60,82 +47,72 @@ public class EscrowService : IEscrowService
 
         await _uow.EscrowContracts.AddAsync(escrow, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
-
-        order.EscrowId = escrow.EscrowId;
-        _uow.Orders.Update(order);
-        await _uow.SaveChangesAsync(cancellationToken);
-
-        return new EscrowResponse(escrow.EscrowId, order.OrderId, escrow.BuyerId ?? 0, escrow.SellerId ?? 0, escrow.DepositAmount, escrow.TotalAmount, escrow.Status, escrow.CreatedAt);
+        return escrow;
     }
 
-    public async Task<EscrowResponse?> GetByOrderAsync(ClaimsPrincipal userPrincipal, long orderId, CancellationToken cancellationToken = default)
+    public async Task<EscrowContract?> FundForOrderAsync(long orderId, long? paymentId, CancellationToken cancellationToken = default)
     {
-        var userId = GetUserId(userPrincipal);
-        var order = await _uow.Orders.Query()
-            .Include(o => o.Escrow)
-            .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
-        if (order == null || order.Escrow == null) return null;
-        if (order.BuyerId != userId && order.SellerId != userId) return null;
-
-        var escrow = order.Escrow;
-        return new EscrowResponse(escrow.EscrowId, order.OrderId, escrow.BuyerId ?? 0, escrow.SellerId ?? 0, escrow.DepositAmount, escrow.TotalAmount, escrow.Status, escrow.CreatedAt);
-    }
-
-    public async Task<EscrowTransactionResponse> AddTransactionAsync(ClaimsPrincipal userPrincipal, long escrowId, CreateEscrowTransactionRequest request, CancellationToken cancellationToken = default)
-    {
-        var userId = GetUserId(userPrincipal);
-        var escrow = await _uow.EscrowContracts.GetByIdAsync(escrowId);
-        if (escrow == null) throw new InvalidOperationException("Escrow not found.");
-        if (escrow.BuyerId != userId && escrow.SellerId != userId)
+        var escrow = await _uow.EscrowContracts.Query()
+            .FirstOrDefaultAsync(e => e.OrderId == orderId, cancellationToken);
+        if (escrow == null)
         {
-            throw new InvalidOperationException("Not allowed.");
+            var order = await _uow.Orders.GetByIdAsync(orderId);
+            if (order == null) return null;
+            escrow = await EnsureForOrderAsync(order, paymentId, cancellationToken);
         }
 
-        var tx = new EscrowTransaction
+        if (paymentId.HasValue && escrow.PaymentId != paymentId)
         {
-            EscrowId = escrow.EscrowId,
-            Method = request.Method,
-            Amount = request.Amount,
-            Type = request.Type,
-            Status = "Pending",
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _uow.EscrowTransactions.AddAsync(tx, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
-
-        if (string.Equals(request.Type, "Deposit", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase))
-        {
-            escrow.Status = EscrowStatuses.Funded;
-            escrow.UpdatedAt = DateTime.UtcNow;
-            _uow.EscrowContracts.Update(escrow);
-            await _uow.SaveChangesAsync(cancellationToken);
+            escrow.PaymentId = paymentId;
         }
 
-        return new EscrowTransactionResponse(tx.TxId, tx.EscrowId ?? 0, tx.Type, tx.Method, tx.Amount, tx.Status, tx.CreatedAt);
+        if (string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase))
+        {
+            return escrow;
+        }
+
+        escrow.Status = EscrowStatuses.Funded;
+        escrow.UpdatedAt = DateTime.UtcNow;
+        _uow.EscrowContracts.Update(escrow);
+        await _uow.SaveChangesAsync(cancellationToken);
+        return escrow;
     }
 
-    public async Task<BasicResponse> ReleaseAsync(ClaimsPrincipal userPrincipal, long escrowId, CancellationToken cancellationToken = default)
+    public async Task<EscrowContract?> ReleaseForOrderAsync(long orderId, CancellationToken cancellationToken = default)
     {
-        var userId = GetUserId(userPrincipal);
-        var escrow = await _uow.EscrowContracts.GetByIdAsync(escrowId);
-        if (escrow == null) return new BasicResponse(false, "Escrow not found.");
-        if (escrow.BuyerId != userId) return new BasicResponse(false, "Only buyer can release.");
-
+        var escrow = await _uow.EscrowContracts.Query()
+            .FirstOrDefaultAsync(e => e.OrderId == orderId, cancellationToken);
+        if (escrow == null) return null;
         if (string.Equals(escrow.Status, EscrowStatuses.Released, StringComparison.OrdinalIgnoreCase))
         {
-            return new BasicResponse(true, "Escrow already released.");
+            return escrow;
         }
         if (!string.Equals(escrow.Status, EscrowStatuses.Funded, StringComparison.OrdinalIgnoreCase))
         {
-            return new BasicResponse(false, "Escrow must be funded before release.");
+            return null;
         }
 
         escrow.Status = EscrowStatuses.Released;
         escrow.UpdatedAt = DateTime.UtcNow;
         _uow.EscrowContracts.Update(escrow);
         await _uow.SaveChangesAsync(cancellationToken);
-        return new BasicResponse(true, "Escrow released.");
+        return escrow;
+    }
+
+    public async Task<EscrowContract?> RefundForOrderAsync(long orderId, CancellationToken cancellationToken = default)
+    {
+        var escrow = await _uow.EscrowContracts.Query()
+            .FirstOrDefaultAsync(e => e.OrderId == orderId, cancellationToken);
+        if (escrow == null) return null;
+        if (string.Equals(escrow.Status, EscrowStatuses.Refunded, StringComparison.OrdinalIgnoreCase))
+        {
+            return escrow;
+        }
+
+        escrow.Status = EscrowStatuses.Refunded;
+        escrow.UpdatedAt = DateTime.UtcNow;
+        _uow.EscrowContracts.Update(escrow);
+        await _uow.SaveChangesAsync(cancellationToken);
+        return escrow;
     }
 }

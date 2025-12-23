@@ -7,7 +7,7 @@ namespace _2GO_EXE_Project.API.Controllers;
 
 [ApiController]
 [Route("api/mod/listings")]
-[Authorize(Roles = "Admin,Manager,Moderator")]
+[Authorize(Roles = "Admin,Manager")]
 public class ModeratorListingsController : ControllerBase
 {
     private readonly IModeratorListingService _modListingService;

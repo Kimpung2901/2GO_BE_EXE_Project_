@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
@@ -23,12 +24,13 @@ public class TokenService : ITokenService
     {
         var now = DateTime.UtcNow;
         var expires = now.AddMinutes(_settings.AccessTokenLifetimeMinutes);
+        var normalizedRole = UserRoles.Normalize(user.Role);
         var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new Claim("phone", user.Phone ?? string.Empty),
-            new Claim(ClaimTypes.Role, user.Role ?? string.Empty)
+            new Claim(ClaimTypes.Role, normalizedRole)
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret));

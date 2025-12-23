@@ -103,6 +103,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "2GO_EXE_Project API", Version = "v1" });
+    c.EnableAnnotations();
     var securityScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",

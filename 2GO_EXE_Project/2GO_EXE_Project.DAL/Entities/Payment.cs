@@ -13,6 +13,8 @@ public partial class Payment
 
     public long? UserId { get; set; }
 
+    public long? OrderId { get; set; }
+
     [Column(TypeName = "decimal(15, 2)")]
     public decimal? Amount { get; set; }
 
@@ -36,4 +38,11 @@ public partial class Payment
     [ForeignKey("UserId")]
     [InverseProperty("Payments")]
     public virtual User? User { get; set; }
+
+    [ForeignKey("OrderId")]
+    [InverseProperty("Payments")]
+    public virtual Order? Order { get; set; }
+
+    [InverseProperty("Payment")]
+    public virtual ICollection<EscrowContract> EscrowContracts { get; set; } = new List<EscrowContract>();
 }
