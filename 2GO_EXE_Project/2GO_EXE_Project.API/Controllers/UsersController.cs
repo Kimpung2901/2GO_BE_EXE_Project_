@@ -34,6 +34,10 @@ public class UsersController : ControllerBase
     [HttpPut("me/password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
+        if (!IsValidPassword(request.NewPassword))
+        {
+            return BadRequest("Password must be at least 8 characters and include at least 1 letter and 1 digit.");
+        }
         var result = await _authService.ChangePasswordAsync(User, request, cancellationToken);
         if (!result.Success)
         {
@@ -65,5 +69,13 @@ public class UsersController : ControllerBase
     {
         var result = await _authService.GetMyActivityAsync(User, cancellationToken);
         return Ok(result);
+    }
+
+    private static bool IsValidPassword(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 8) return false;
+        var hasLetter = value.Any(char.IsLetter);
+        var hasDigit = value.Any(char.IsDigit);
+        return hasLetter && hasDigit;
     }
 }
