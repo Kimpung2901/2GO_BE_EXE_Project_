@@ -35,6 +35,8 @@ public partial class User
     [Unicode(false)]
     public string? Status { get; set; }
 
+    public DateTime? BanUntil { get; set; }
+
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? LastLoginAt { get; set; }

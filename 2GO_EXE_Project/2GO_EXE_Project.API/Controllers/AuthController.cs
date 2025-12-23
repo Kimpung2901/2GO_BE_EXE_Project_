@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
+using System.Security.Claims;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 
@@ -176,36 +177,6 @@ public class AuthController : ControllerBase
         return Regex.IsMatch(value, pattern);
     }
 
-    [HttpPost("resend-verification-phone")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ResendVerificationPhone([FromBody] SendPhoneVerificationRequest request, CancellationToken cancellationToken)
-    {
-        if (!IsValidPhone(request.Phone))
-        {
-            return BadRequest("Phone must be exactly 10 digits.");
-        }
-
-        var result = await _authService.SendPhoneVerificationAsync(request, cancellationToken);
-        return Ok(result);
-    }
-
-    [HttpPost("verify-phone")]
-    [AllowAnonymous]
-    public async Task<IActionResult> VerifyPhone([FromBody] VerifyPhoneRequest request, CancellationToken cancellationToken)
-    {
-        if (!IsValidPhone(request.Phone))
-        {
-            return BadRequest("Phone must be exactly 10 digits.");
-        }
-        if (string.IsNullOrWhiteSpace(request.Code))
-        {
-            return BadRequest("Verification code is required.");
-        }
-
-        var result = await _authService.VerifyPhoneAsync(request, cancellationToken);
-        return Ok(result);
-    }
-
     [HttpPost("firebase-login")]
     [AllowAnonymous]
     public async Task<IActionResult> FirebaseLogin([FromBody] FirebaseLoginRequest request, CancellationToken cancellationToken)
@@ -224,5 +195,13 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(ex.Message);
         }
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        var result = await _authService.GetCurrentUserAsync(User, cancellationToken);                       
+        return Ok(result);
     }
 }

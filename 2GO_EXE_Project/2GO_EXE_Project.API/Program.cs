@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
+using Microsoft.OpenApi.Models;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.BAL.Services;
@@ -11,18 +12,37 @@ using _2GO_EXE_Project.BAL.Settings;
 using _2GO_EXE_Project.DAL.Context;
 using _2GO_EXE_Project.DAL.Repositories.Implementations;
 using _2GO_EXE_Project.DAL.Repositories.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<GmailEmailSettings>(builder.Configuration.GetSection("Gmail"));
-builder.Services.Configure<FirebaseSmsSettings>(builder.Configuration.GetSection("FirebaseSms"));
+builder.Services.Configure<_2GO_EXE_Project.BAL.Settings.PaymentGatewaySettings>(builder.Configuration.GetSection("PaymentGateway"));
+builder.Services.Configure<MomoSettings>(builder.Configuration.GetSection("Momo"));
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<ISmsService, FirebaseSmsService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<IModeratorService, ModeratorService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ISubCategoryService, SubCategoryService>();
+builder.Services.AddScoped<IListingService, ListingService>();
+builder.Services.AddScoped<ISellerListingService, SellerListingService>();
+builder.Services.AddScoped<IAdminListingService, AdminListingService>();
+builder.Services.AddScoped<IModeratorListingService, ModeratorListingService>();
+builder.Services.AddScoped<ISavedListingService, SavedListingService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IPaymentGateway, HmacPaymentGateway>();
+builder.Services.AddHttpClient<IMomoPaymentGateway, MomoPaymentGateway>();
+builder.Services.AddScoped<IEscrowService, EscrowService>();
+builder.Services.AddScoped<IShippingService, ShippingService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -44,7 +64,9 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtSection.Issuer,
         ValidAudience = jwtSection.Audience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection.Secret)),
-        ClockSkew = TimeSpan.Zero
+        ClockSkew = TimeSpan.Zero,
+        NameClaimType = JwtRegisteredClaimNames.Sub,
+        RoleClaimType = ClaimTypes.Role
     };
 });
 
@@ -80,7 +102,30 @@ if (FirebaseApp.DefaultInstance == null)
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "2GO_EXE_Project API", Version = "v1" });
+    c.EnableAnnotations();
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter JWT Bearer token",
+        Reference = new OpenApiReference
+        {
+            Type = ReferenceType.SecurityScheme,
+            Id = "Bearer"
+        }
+    };
+    c.AddSecurityDefinition("Bearer", securityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { securityScheme, Array.Empty<string>() }
+    });
+});
 
 var app = builder.Build();
 

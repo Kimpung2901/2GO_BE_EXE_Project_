@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FirebaseAdmin;
 using FirebaseAdmin.Auth;
+using System.Security.Claims;
+using _2GO_EXE_Project.BAL.Constants;
 using _2GO_EXE_Project.BAL.DTOs.Auth;
 using _2GO_EXE_Project.BAL.Interfaces;
 using _2GO_EXE_Project.DAL.Entities;
@@ -16,7 +18,6 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IEmailService _emailService;
-    private readonly ISmsService _smsService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -25,7 +26,6 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IPasswordHasher passwordHasher,
         IEmailService emailService,
-        ISmsService smsService,
         IOptions<JwtSettings> jwtOptions,
         ILogger<AuthService> logger)
     {
@@ -33,7 +33,6 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _passwordHasher = passwordHasher;
         _emailService = emailService;
-        _smsService = smsService;
         _jwtSettings = jwtOptions.Value;
         _logger = logger;
 
@@ -71,7 +70,7 @@ public class AuthService : IAuthService
             Phone = request.Phone,
             PasswordHash = hash,
             Salt = salt,
-            Role = "User",
+            Role = UserRoles.User,
             Status = "Active",
             CreatedAt = DateTime.UtcNow
         };
@@ -82,7 +81,14 @@ public class AuthService : IAuthService
         var code = await CreateVerificationCodeAsync(user.UserId, "EmailVerify", cancellationToken);
         if (!string.IsNullOrWhiteSpace(user.Email))
         {
-            await _emailService.SendAsync(user.Email, "Verify your email", $"Your verification code is: {code}", cancellationToken);
+            try
+            {
+                await _emailService.SendAsync(user.Email, "Verify your email", $"Your verification code is: {code}", cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send verification email to {Email}", user.Email);
+            }
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
@@ -105,6 +111,13 @@ public class AuthService : IAuthService
         if (user.Status != "Active")
         {
             throw new UnauthorizedAccessException("Account is not active.");
+        }
+
+        var normalizedRole = UserRoles.Normalize(user.Role);
+        if (!string.Equals(user.Role, normalizedRole, StringComparison.Ordinal))
+        {
+            user.Role = normalizedRole;
+            _uow.Users.Update(user);
         }
 
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash, user.Salt))
@@ -228,73 +241,6 @@ public class AuthService : IAuthService
         return new BasicResponse(true, "Email verified.");
     }
 
-    public async Task<BasicResponse> SendPhoneVerificationAsync(SendPhoneVerificationRequest request, CancellationToken cancellationToken = default)
-    {
-        var user = await _uow.Users.Query().FirstOrDefaultAsync(u => u.Phone == request.Phone, cancellationToken);
-        if (user == null)
-        {
-            return new BasicResponse(false, "User not found.");
-        }
-
-        var code = await CreateVerificationCodeAsync(user.UserId, "PhoneVerify", cancellationToken);
-        await _smsService.SendAsync(request.Phone, $"Your verification code is: {code}", cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
-        return new BasicResponse(true, "Verification code sent to phone.");
-    }
-
-    public async Task<BasicResponse> VerifyPhoneAsync(VerifyPhoneRequest request, CancellationToken cancellationToken = default)
-    {
-        var user = await _uow.Users.Query().FirstOrDefaultAsync(u => u.Phone == request.Phone, cancellationToken);
-        if (user == null)
-        {
-            return new BasicResponse(false, "User not found.");
-        }
-
-        var codeEntity = await _uow.VerificationCodes.Query()
-            .FirstOrDefaultAsync(c =>
-                c.UserId == user.UserId &&
-                c.Code == request.Code &&
-                c.Purpose == "PhoneVerify" &&
-                c.ConsumedAt == null &&
-                c.ExpiresAt >= DateTime.UtcNow,
-                cancellationToken);
-
-        if (codeEntity == null)
-        {
-            return new BasicResponse(false, "Code invalid or expired.");
-        }
-
-        codeEntity.ConsumedAt = DateTime.UtcNow;
-        _uow.VerificationCodes.Update(codeEntity);
-
-        var userVerify = await _uow.UserVerifications.Query()
-            .FirstOrDefaultAsync(v => v.UserId == user.UserId, cancellationToken);
-
-        if (userVerify == null)
-        {
-            userVerify = new UserVerification
-            {
-                UserId = user.UserId,
-                PhoneVerified = true,
-                VerifiedAt = DateTime.UtcNow
-            };
-            await _uow.UserVerifications.AddAsync(userVerify, cancellationToken);
-        }
-        else
-        {
-            userVerify.PhoneVerified = true;
-            userVerify.VerifiedAt = DateTime.UtcNow;
-            _uow.UserVerifications.Update(userVerify);
-        }
-
-        await _uow.SaveChangesAsync(cancellationToken);
-
-        // FIX 4: Clean up expired verification codes
-        await CleanupExpiredVerificationCodesAsync(user.UserId, cancellationToken);
-
-        return new BasicResponse(true, "Phone verified.");
-    }
-
     public async Task<AuthResponse> FirebaseLoginAsync(FirebaseLoginRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.IdToken))
@@ -333,7 +279,7 @@ public class AuthService : IAuthService
             {
                 Phone = phone,
                 Email = email,
-                Role = "User",
+                Role = UserRoles.User,
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow
             };
@@ -342,14 +288,20 @@ public class AuthService : IAuthService
         }
         else
         {
-            // FIX 3: Check user status for existing users
+            
             if (user.Status != "Active")
             {
                 throw new UnauthorizedAccessException("Account is not active.");
             }
+
+            var normalizedRole = UserRoles.Normalize(user.Role);
+            if (!string.Equals(user.Role, normalizedRole, StringComparison.Ordinal))
+            {
+                user.Role = normalizedRole;
+                _uow.Users.Update(user);
+            }
         }
 
-        // FIX 5: Mark both phone and email as verified when Firebase login
         var userVerify = await _uow.UserVerifications.Query()
             .FirstOrDefaultAsync(v => v.UserId == user.UserId, cancellationToken);
         
@@ -388,6 +340,319 @@ public class AuthService : IAuthService
         return new AuthResponse(user.UserId, user.Email, user.Phone, accessToken, refreshToken, expiresAt);
     }
 
+    public async Task<UserInfoResponse> GetCurrentUserAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserVerifications)
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        // auto unban if expired
+        if (user.Status == "Banned" && user.BanUntil != null && user.BanUntil <= DateTime.UtcNow)
+        {
+            user.Status = "Active";
+            user.BanUntil = null;
+            _uow.Users.Update(user);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+
+        var verification = user.UserVerifications.FirstOrDefault();
+        var emailVerified = verification?.EmailVerified ?? false;
+        var phoneVerified = verification?.PhoneVerified ?? false;
+        var profile = user.UserProfiles.FirstOrDefault();
+        var profileInfo = profile == null
+            ? null
+            : new UserProfileInfo(
+                profile.FullName,
+                profile.DateOfBirth,
+                profile.Gender,
+                profile.AddressLine,
+                profile.Bio,
+                profile.AvatarUrl);
+
+        return new UserInfoResponse(
+            user.UserId,
+            user.Email,
+            user.Phone,
+            user.Role,
+            user.Status,
+            user.CreatedAt,
+            user.LastLoginAt,
+            emailVerified,
+            phoneVerified,
+            profileInfo);
+    }
+
+    public async Task<UserInfoResponse> UpdateCurrentUserProfileAsync(ClaimsPrincipal userPrincipal, UpdateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserVerifications)
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var profile = user.UserProfiles.FirstOrDefault();
+        var isNewProfile = profile == null;
+        if (profile == null)
+        {
+            profile = new UserProfile
+            {
+                UserId = user.UserId
+            };
+            await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+        }
+
+        profile.FullName = request.FullName ?? profile.FullName;
+        profile.DateOfBirth = request.Birthday ?? profile.DateOfBirth;
+        profile.Gender = request.Gender ?? profile.Gender;
+        profile.AddressLine = request.Address ?? profile.AddressLine;
+        profile.Bio = request.Bio ?? profile.Bio;
+        profile.AvatarUrl = request.AvatarUrl ?? profile.AvatarUrl;
+
+        if (!isNewProfile)
+        {
+            _uow.UserProfiles.Update(profile);
+        }
+
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        var verification = user.UserVerifications.FirstOrDefault();
+        var emailVerified = verification?.EmailVerified ?? false;
+        var phoneVerified = verification?.PhoneVerified ?? false;
+
+        var profileInfo = new UserProfileInfo(
+            profile.FullName,
+            profile.DateOfBirth,
+            profile.Gender,
+            profile.AddressLine,
+            profile.Bio,
+            profile.AvatarUrl);
+
+        return new UserInfoResponse(
+            user.UserId,
+            user.Email,
+            user.Phone,
+            user.Role,
+            user.Status,
+            user.CreatedAt,
+            user.LastLoginAt,
+            emailVerified,
+            phoneVerified,
+            profileInfo);
+    }
+
+    public async Task<BasicResponse> ChangePasswordAsync(ClaimsPrincipal userPrincipal, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null || string.IsNullOrEmpty(user.PasswordHash) || string.IsNullOrEmpty(user.Salt))
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        if (!_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash, user.Salt))
+        {
+            return new BasicResponse(false, "Current password is incorrect.");
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword, out var newSalt);
+        user.Salt = newSalt;
+        _uow.Users.Update(user);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        // revoke all refresh tokens to force re-login
+        var tokens = await _uow.RefreshTokens.Query()
+            .Where(t => t.UserId == user.UserId && t.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var t in tokens)
+        {
+            t.RevokedAt = DateTime.UtcNow;
+        }
+        _uow.RefreshTokens.UpdateRange(tokens);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        return new BasicResponse(true, "Password changed. Please login again.");
+    }
+
+    public async Task<IReadOnlyList<DeviceResponse>> GetMyDevicesAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var devices = await _uow.UserDevices.Query()
+            .Where(d => d.UserId == userId)
+            .OrderByDescending(d => d.LastActive)
+            .Select(d => new DeviceResponse(d.DeviceId, d.DeviceInfo, d.Ipaddress, d.LastActive))
+            .ToListAsync(cancellationToken);
+
+        return devices;
+    }
+
+    public async Task<BasicResponse> RemoveMyDeviceAsync(ClaimsPrincipal userPrincipal, long deviceId, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var device = await _uow.UserDevices.Query()
+            .FirstOrDefaultAsync(d => d.DeviceId == deviceId && d.UserId == userId, cancellationToken);
+
+        if (device == null)
+        {
+            return new BasicResponse(false, "Device not found.");
+        }
+
+        _uow.UserDevices.Remove(device);
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new BasicResponse(true, "Device removed.");
+    }
+
+    public async Task<IReadOnlyList<ActivityResponse>> GetMyActivityAsync(ClaimsPrincipal userPrincipal, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var logs = await _uow.ActivityLogs.Query()
+            .Where(l => l.UserId == userId)
+            .OrderByDescending(l => l.CreatedAt)
+            .Select(l => new ActivityResponse(l.LogId, l.Action, l.Details, l.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return logs;
+    }
+
+    public async Task<BasicResponse> UpdateAvatarAsync(ClaimsPrincipal userPrincipal, UpdateAvatarRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var profile = user.UserProfiles.FirstOrDefault();
+        var isNew = profile == null;
+        if (profile == null)
+        {
+            profile = new UserProfile { UserId = userId };
+            await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+        }
+
+        profile.AvatarUrl = request.AvatarUrl;
+        if (!isNew)
+        {
+            _uow.UserProfiles.Update(profile);
+        }
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new BasicResponse(true, "Avatar updated.");
+    }
+
+    public async Task<BasicResponse> UpdateAddressAsync(ClaimsPrincipal userPrincipal, UpdateAddressRequest request, CancellationToken cancellationToken = default)
+    {
+        var sub = userPrincipal.FindFirst("sub")?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? userPrincipal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (!long.TryParse(sub, out var userId))
+        {
+            throw new UnauthorizedAccessException("Invalid user id in token.");
+        }
+
+        var user = await _uow.Users.Query()
+            .Include(u => u.UserProfiles)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var profile = user.UserProfiles.FirstOrDefault();
+        var isNew = profile == null;
+        if (profile == null)
+        {
+            profile = new UserProfile { UserId = userId };
+            await _uow.UserProfiles.AddAsync(profile, cancellationToken);
+        }
+
+        profile.AddressLine = request.Address ?? profile.AddressLine;
+        profile.CityId = request.CityId ?? profile.CityId;
+        profile.DistrictId = request.DistrictId ?? profile.DistrictId;
+        profile.WardId = request.WardId ?? profile.WardId;
+
+        if (!isNew)
+        {
+            _uow.UserProfiles.Update(profile);
+        }
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new BasicResponse(true, "Address updated.");
+    }
+
     public async Task<BasicResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.Query().FirstOrDefaultAsync(u => u.Email == request.Email, cancellationToken);
@@ -397,7 +662,14 @@ public class AuthService : IAuthService
         }
 
         var code = await CreateVerificationCodeAsync(user.UserId, "ForgotPassword", cancellationToken);
-        await _emailService.SendAsync(request.Email, "Reset password", $"Your reset code is: {code}", cancellationToken);
+        try
+        {
+            await _emailService.SendAsync(request.Email, "Reset password", $"Your reset code is: {code}", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send forgot-password email to {Email}", request.Email);
+        }
         await _uow.SaveChangesAsync(cancellationToken);
         return new BasicResponse(true, "If the email exists, a code has been sent.");
     }
@@ -443,7 +715,6 @@ public class AuthService : IAuthService
 
         await _uow.SaveChangesAsync(cancellationToken);
 
-        // FIX 4: Clean up expired verification codes
         await CleanupExpiredVerificationCodesAsync(user.UserId, cancellationToken);
 
         return new BasicResponse(true, "Password reset successful.");
@@ -480,7 +751,6 @@ public class AuthService : IAuthService
         return token;
     }
 
-    // FIX 4: Add method to clean up expired verification codes
     private async Task CleanupExpiredVerificationCodesAsync(long userId, CancellationToken cancellationToken)
     {
         var expiredCodes = await _uow.VerificationCodes.Query()

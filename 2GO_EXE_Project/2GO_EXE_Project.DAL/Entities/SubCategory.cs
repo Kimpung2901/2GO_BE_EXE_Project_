@@ -17,6 +17,8 @@ public partial class SubCategory
     [Unicode(false)]
     public string? Name { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     [ForeignKey("CategoryId")]
     [InverseProperty("SubCategories")]
     public virtual Category? Category { get; set; }
