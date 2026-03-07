@@ -1,0 +1,658 @@
+[
+  {
+    "id": "fee_listing",
+    "domain": "subscription",
+    "intent": "subscription_listing_fee_policy",
+    "priority": 1,
+    "patterns": [
+      "phí đăng bài",
+      "đăng bài có mất phí không",
+      "đăng bài có tốn tiền không",
+      "miễn phí đăng bài",
+      "phí đăng tin"
+    ],
+    "negative_patterns": [
+      "giá bán",
+      "giá sản phẩm",
+      "giá tham khảo"
+    ],
+    "answer": "Hiện tại phí đăng bài là miễn phí cho số lượng giới hạn. Sau đó bạn có thể mua thêm gói đăng bài nếu có nhu cầu."
+  },
+  {
+    "id": "listing_pending",
+    "domain": "listing",
+    "intent": "listing_pending_review_reason",
+    "priority": 1,
+    "patterns": [
+      "bài đăng bị chờ duyệt",
+      "tại sao bị chờ duyệt",
+      "bài đăng đang pending",
+      "pending review là gì",
+      "bị giữ để duyệt thủ công"
+    ],
+    "negative_patterns": [
+      "từ chối",
+      "rejected"
+    ],
+    "answer": "Bài đăng có thể bị chờ duyệt do hình ảnh chưa rõ, giá bán bất thường hoặc nội dung có dấu hiệu vi phạm. Hệ thống AI sẽ kiểm tra trước và chuyển sang duyệt thủ công nếu cần."
+  },
+  {
+    "id": "image_quality",
+    "domain": "listing",
+    "intent": "listing_image_quality_requirement",
+    "priority": 2,
+    "patterns": [
+      "ảnh như thế nào thì được duyệt",
+      "yêu cầu ảnh đăng bài",
+      "ảnh bị mờ có đăng được không",
+      "ảnh bị che khuất có bị từ chối không",
+      "tiêu chuẩn hình ảnh"
+    ],
+    "negative_patterns": [
+      "số lượng ảnh",
+      "cần bao nhiêu ảnh"
+    ],
+    "answer": "Hình ảnh cần rõ nét, đủ sáng, không bị mờ, không che khuất sản phẩm và không chứa thông tin liên hệ bên ngoài."
+  },
+  {
+    "id": "listing_edit",
+    "domain": "listing",
+    "intent": "listing_edit_after_publish",
+    "priority": 2,
+    "patterns": [
+      "chỉnh sửa bài đăng sau khi đăng",
+      "sửa bài đăng đã đăng",
+      "có thể edit bài đã đăng không",
+      "chỉnh sửa khi có đơn hàng",
+      "sửa nội dung bài đăng"
+    ],
+    "negative_patterns": [
+      "xóa bài đăng"
+    ],
+    "answer": "Bạn có thể chỉnh sửa bài đăng khi bài chưa được duyệt hoặc chưa có giao dịch phát sinh. Sau khi có đơn hàng, việc chỉnh sửa sẽ bị giới hạn."
+  },
+  {
+    "id": "listing_delete",
+    "domain": "listing",
+    "intent": "listing_delete_policy",
+    "priority": 2,
+    "patterns": [
+      "xóa bài đăng",
+      "gỡ bài đăng",
+      "xoá bài đã đăng",
+      "xóa bài khi đã có đơn",
+      "xóa bài có được không"
+    ],
+    "negative_patterns": [
+      "chỉnh sửa bài đăng"
+    ],
+    "answer": "Bạn có thể xóa bài đăng khi chưa có đơn hàng. Nếu đã có giao dịch, bài đăng sẽ được lưu để phục vụ đối soát."
+  },
+  {
+    "id": "listing_limit",
+    "domain": "subscription",
+    "intent": "subscription_listing_limit",
+    "priority": 1,
+    "patterns": [
+      "đăng tối đa bao nhiêu bài",
+      "giới hạn số bài đăng",
+      "mỗi tài khoản đăng được bao nhiêu",
+      "quota đăng bài",
+      "hạn mức đăng tin"
+    ],
+    "negative_patterns": [
+      "phí đăng bài",
+      "giá gói"
+    ],
+    "answer": "Số lượng bài đăng phụ thuộc vào gói tài khoản và chính sách hiện tại của hệ thống."
+  },
+  {
+    "id": "ai_pricing",
+    "domain": "pricing",
+    "intent": "pricing_ai_reference_source",
+    "priority": 2,
+    "patterns": [
+      "ai gợi ý giá dựa trên đâu",
+      "ai định giá dựa vào gì",
+      "giá tham khảo được tính thế nào",
+      "cách ai đề xuất giá"
+    ],
+    "negative_patterns": [
+      "giá quá thấp",
+      "giá quá cao"
+    ],
+    "answer": "AI gợi ý giá dựa trên tình trạng sản phẩm, dữ liệu giao dịch nội bộ và các quy tắc khấu hao. Giá chỉ mang tính tham khảo. Luu y: AI rule-based, khong phai mo hinh hoc may."
+  },
+  {
+    "id": "price_not_mandatory",
+    "domain": "pricing",
+    "intent": "pricing_ai_is_optional",
+    "priority": 2,
+    "patterns": [
+      "giá ai có bắt buộc không",
+      "có phải theo giá ai không",
+      "giá gợi ý có bắt buộc",
+      "có thể không theo giá ai"
+    ],
+    "negative_patterns": [
+      "ai gợi ý giá dựa trên đâu"
+    ],
+    "answer": "Không. Giá AI gợi ý chỉ để tham khảo, người bán hoàn toàn quyết định mức giá cuối cùng."
+  },
+  {
+    "id": "price_too_low",
+    "domain": "pricing",
+    "intent": "pricing_too_low_risk",
+    "priority": 2,
+    "patterns": [
+      "giá bán quá thấp",
+      "bán rẻ có sao không",
+      "giá thấp bất thường",
+      "đăng giá thấp có bị gì không"
+    ],
+    "negative_patterns": [
+      "giá quá cao"
+    ],
+    "answer": "Giá quá thấp so với mức tham khảo có thể bị hệ thống đánh dấu rủi ro để đảm bảo an toàn cho người mua."
+  },
+  {
+    "id": "price_high",
+    "domain": "pricing",
+    "intent": "pricing_too_high_visibility",
+    "priority": 2,
+    "patterns": [
+      "giá bán quá cao",
+      "bán đắt có sao không",
+      "giá cao có bị từ chối không",
+      "đăng giá cao có bị hạn chế không"
+    ],
+    "negative_patterns": [
+      "giá quá thấp"
+    ],
+    "answer": "Giá quá cao so với mức tham khảo có thể khiến bài đăng ít hiển thị hơn nhưng không bị từ chối nếu không vi phạm quy định."
+  },
+  {
+    "id": "risk_flag",
+    "domain": "safety",
+    "intent": "listing_risk_flag_reason",
+    "priority": 2,
+    "patterns": [
+      "bài đăng bị đánh dấu rủi ro",
+      "tại sao bị gắn cờ",
+      "bị flag rủi ro",
+      "vì sao bị cảnh báo rủi ro"
+    ],
+    "negative_patterns": [
+      "bị từ chối",
+      "bị chờ duyệt"
+    ],
+    "answer": "Bài đăng có thể bị đánh dấu rủi ro nếu giá bất thường, nội dung spam, chứa link ngoài hoặc số điện thoại."
+  },
+  {
+    "id": "reject_listing",
+    "domain": "listing",
+    "intent": "listing_reject_reason",
+    "priority": 1,
+    "patterns": [
+      "bài đăng bị từ chối",
+      "khi nào bị reject",
+      "vì sao bị từ chối",
+      "rejected là gì",
+      "bị từ chối duyệt"
+    ],
+    "negative_patterns": [
+      "chờ duyệt",
+      "pending"
+    ],
+    "answer": "Bài đăng sẽ bị từ chối nếu vi phạm nghiêm trọng như hàng cấm, lừa đảo rõ ràng hoặc nội dung không phù hợp."
+  },
+  {
+    "id": "escrow",
+    "domain": "payment",
+    "intent": "escrow_definition",
+    "priority": 2,
+    "patterns": [
+      "escrow là gì",
+      "giữ tiền là gì",
+      "cơ chế giữ tiền",
+      "thanh toán ký quỹ"
+    ],
+    "negative_patterns": [
+      "giải ngân escrow"
+    ],
+    "answer": "Escrow là cơ chế giữ tiền tạm thời để đảm bảo người mua nhận hàng đúng mô tả trước khi người bán được thanh toán."
+  },
+  {
+    "id": "escrow_release",
+    "domain": "payment",
+    "intent": "escrow_release_timing",
+    "priority": 2,
+    "patterns": [
+      "khi nào giải ngân escrow",
+      "bao giờ người bán nhận tiền",
+      "giải ngân tiền ký quỹ",
+      "tiền escrow được trả khi nào"
+    ],
+    "negative_patterns": [
+      "escrow là gì"
+    ],
+    "answer": "Tiền escrow sẽ được giải ngân sau khi người mua xác nhận đã nhận hàng và không có khiếu nại."
+  },
+  {
+    "id": "refund",
+    "domain": "payment",
+    "intent": "refund_process",
+    "priority": 2,
+    "patterns": [
+      "hoàn tiền như thế nào",
+      "refund như thế nào",
+      "hoàn tiền khi hủy đơn",
+      "khi nào được hoàn tiền"
+    ],
+    "negative_patterns": [
+      "tranh chấp"
+    ],
+    "answer": "Hoàn tiền được xử lý sau khi có quyết định tranh chấp hoặc khi đơn hàng bị hủy theo chính sách."
+  },
+  {
+    "id": "dispute",
+    "domain": "dispute",
+    "intent": "dispute_open",
+    "priority": 2,
+    "patterns": [
+      "mở tranh chấp",
+      "khiếu nại đơn hàng",
+      "báo tranh chấp",
+      "tạo dispute"
+    ],
+    "negative_patterns": [
+      "hoàn tiền"
+    ],
+    "answer": "Bạn có thể mở tranh chấp trong trang chi tiết đơn hàng nếu sản phẩm không đúng mô tả hoặc có vấn đề phát sinh."
+  },
+  {
+    "id": "shipping_create",
+    "domain": "shipping",
+    "intent": "shipping_create_request",
+    "priority": 2,
+    "patterns": [
+      "tạo vận chuyển",
+      "tạo giao hàng",
+      "tạo đơn vận chuyển",
+      "đăng ký giao hàng"
+    ],
+    "negative_patterns": [
+      "theo dõi đơn hàng"
+    ],
+    "answer": "Bạn có thể tạo vận chuyển trong trang quản lý đơn hàng sau khi đơn được xác nhận."
+  },
+  {
+    "id": "shipping_delay",
+    "domain": "shipping",
+    "intent": "shipping_delay_action",
+    "priority": 2,
+    "patterns": [
+      "giao hàng bị trễ",
+      "đơn giao bị chậm",
+      "vận chuyển bị trễ",
+      "trễ giao hàng phải làm sao"
+    ],
+    "negative_patterns": [
+      "theo dõi đơn hàng"
+    ],
+    "answer": "Nếu giao hàng trễ, bạn có thể liên hệ người bán hoặc mở yêu cầu hỗ trợ trong hệ thống."
+  },
+  {
+    "id": "tracking",
+    "domain": "shipping",
+    "intent": "shipping_tracking",
+    "priority": 2,
+    "patterns": [
+      "theo dõi đơn hàng",
+      "tra cứu vận đơn",
+      "xem trạng thái giao hàng",
+      "tracking đơn hàng"
+    ],
+    "negative_patterns": [
+      "tạo vận chuyển"
+    ],
+    "answer": "Bạn có thể theo dõi trạng thái giao hàng trực tiếp trong chi tiết đơn hàng bằng mã vận đơn."
+  },
+  {
+    "id": "buyer_safe",
+    "domain": "safety",
+    "intent": "buyer_safety_tips",
+    "priority": 2,
+    "patterns": [
+      "mua hàng an toàn",
+      "làm sao mua an toàn",
+      "tránh lừa đảo khi mua",
+      "cần lưu ý khi mua"
+    ],
+    "negative_patterns": [
+      "người bán uy tín"
+    ],
+    "answer": "Bạn nên giao dịch qua hệ thống escrow, kiểm tra đánh giá người bán và không thanh toán bên ngoài nền tảng."
+  },
+  {
+    "id": "similar_products",
+    "domain": "product",
+    "intent": "product_similar_suggestions",
+    "priority": 3,
+    "patterns": [
+      "có sản phẩm tương tự không",
+      "gợi ý sản phẩm giống",
+      "tìm đồ tương tự",
+      "sản phẩm gần giống"
+    ],
+    "negative_patterns": [
+      "giá tham khảo"
+    ],
+    "answer": "Hệ thống sẽ gợi ý các sản phẩm tương tự dựa trên danh mục, giá và tình trạng sản phẩm."
+  },
+  {
+    "id": "seller_rating",
+    "domain": "account",
+    "intent": "seller_rating_howto",
+    "priority": 2,
+    "patterns": [
+      "đánh giá người bán",
+      "chấm điểm người bán",
+      "review người bán",
+      "đánh giá sau giao dịch"
+    ],
+    "negative_patterns": [
+      "người bán uy tín"
+    ],
+    "answer": "Sau mỗi giao dịch thành công, người mua có thể đánh giá người bán để xây dựng uy tín trên nền tảng."
+  },
+  {
+    "id": "fake_seller",
+    "domain": "safety",
+    "intent": "seller_trustworthiness_check",
+    "priority": 2,
+    "patterns": [
+      "làm sao biết người bán uy tín",
+      "người bán có đáng tin không",
+      "cách kiểm tra người bán",
+      "tránh người bán lừa đảo"
+    ],
+    "negative_patterns": [
+      "đánh giá người bán"
+    ],
+    "answer": "Hệ thống hiển thị điểm uy tín, lịch sử giao dịch và cảnh báo rủi ro nếu phát hiện hành vi bất thường."
+  },
+  {
+    "id": "account_verify",
+    "domain": "account",
+    "intent": "account_verification_requirement",
+    "priority": 2,
+    "patterns": [
+      "cần xác minh tài khoản không",
+      "bắt buộc xác minh tài khoản",
+      "xác minh tài khoản để làm gì",
+      "xác thực tài khoản"
+    ],
+    "negative_patterns": [
+      "tài khoản bị hack"
+    ],
+    "answer": "Một số tính năng nâng cao có thể yêu cầu xác minh tài khoản để đảm bảo an toàn giao dịch."
+  },
+  {
+    "id": "account_hack",
+    "domain": "account",
+    "intent": "account_hacked_action",
+    "priority": 1,
+    "patterns": [
+      "tài khoản bị hack",
+      "bị chiếm tài khoản",
+      "mất tài khoản",
+      "tài khoản bị đánh cắp"
+    ],
+    "negative_patterns": [
+      "xác minh tài khoản"
+    ],
+    "answer": "Bạn nên đổi mật khẩu ngay và liên hệ bộ phận hỗ trợ để được kiểm tra và bảo vệ tài khoản."
+  },
+  {
+    "id": "report_listing",
+    "domain": "listing",
+    "intent": "listing_report_abuse",
+    "priority": 2,
+    "patterns": [
+      "báo cáo bài đăng",
+      "report bài đăng",
+      "bài đăng vi phạm báo ở đâu",
+      "tố cáo bài đăng xấu"
+    ],
+    "negative_patterns": [
+      "tranh chấp"
+    ],
+    "answer": "Bạn có thể dùng chức năng báo cáo trong chi tiết bài đăng để gửi phản hồi cho hệ thống."
+  },
+  {
+    "id": "chatbot_role",
+    "domain": "chatbot",
+    "intent": "chatbot_capabilities",
+    "priority": 2,
+    "patterns": [
+      "chatbot ai làm được gì",
+      "chatbot hỗ trợ gì",
+      "có thể hỏi chatbot gì",
+      "vai trò chatbot"
+    ],
+    "negative_patterns": [
+      "báo cáo bài đăng",
+      "tranh chấp"
+    ],
+    "answer": "Chatbot AI giúp giải đáp thắc mắc, giải thích kết quả AI phân tích và hướng dẫn sử dụng hệ thống. Chatbot không thay thế quyết định của người dùng. Luu y: AI rule-based, khong phai mo hinh hoc may."
+  },
+  {
+    "id": "product_condition_meaning",
+    "domain": "product",
+    "intent": "product_condition_definition",
+    "priority": 2,
+    "patterns": [
+      "tình trạng new good fair poor nghĩa là gì",
+      "new good fair poor là sao",
+      "giải thích tình trạng sản phẩm",
+      "ý nghĩa tình trạng sản phẩm"
+    ],
+    "negative_patterns": [
+      "ai xác định tình trạng"
+    ],
+    "answer": "NEW là gần như mới chưa sử dụng hoặc rất ít dùng. GOOD là đã dùng nhưng còn tốt. FAIR là đã dùng lâu, có hao mòn. POOR là tình trạng kém, nhiều trầy xước hoặc lỗi."
+  },
+  {
+    "id": "condition_ai_detect",
+    "domain": "product",
+    "intent": "product_condition_ai_detection",
+    "priority": 2,
+    "patterns": [
+      "ai xác định tình trạng sản phẩm",
+      "ai phân tích tình trạng",
+      "ai nhận biết tình trạng",
+      "cách ai đánh giá tình trạng"
+    ],
+    "negative_patterns": [
+      "tình trạng new good fair poor nghĩa là gì"
+    ],
+    "answer": "AI phân tích mô tả, hình ảnh và thông tin người bán cung cấp để ước lượng tình trạng sử dụng của sản phẩm."
+  },
+  {
+    "id": "product_real_or_fake",
+    "domain": "product",
+    "intent": "product_fake_detection",
+    "priority": 2,
+    "patterns": [
+      "ai nhận biết hàng giả",
+      "có phát hiện hàng fake không",
+      "ai phân biệt thật giả",
+      "phát hiện hàng nhái"
+    ],
+    "negative_patterns": [
+      "chất lượng sản phẩm"
+    ],
+    "answer": "AI có thể phát hiện một số dấu hiệu bất thường trong mô tả hoặc hình ảnh, nhưng không thể đảm bảo 100%. Người mua nên kiểm tra kỹ trước khi giao dịch."
+  },
+  {
+    "id": "product_quality_check",
+    "domain": "product",
+    "intent": "product_quality_assessment_basis",
+    "priority": 2,
+    "patterns": [
+      "chất lượng sản phẩm đánh giá dựa trên đâu",
+      "tiêu chí đánh giá chất lượng",
+      "chất lượng được xác định thế nào",
+      "ai đánh giá chất lượng"
+    ],
+    "negative_patterns": [
+      "ai nhận biết hàng giả"
+    ],
+    "answer": "Chất lượng sản phẩm được đánh giá dựa trên hình ảnh, mô tả, tình trạng sử dụng và dữ liệu giao dịch nội bộ tương tự."
+  },
+  {
+    "id": "product_price_reference",
+    "domain": "pricing",
+    "intent": "product_price_reference_definition",
+    "priority": 2,
+    "patterns": [
+      "giá tham khảo là gì",
+      "giá tham khảo của sản phẩm",
+      "mức giá tham khảo",
+      "giá tham khảo có bắt buộc không"
+    ],
+    "negative_patterns": [
+      "ai gợi ý giá dựa trên đâu"
+    ],
+    "answer": "Giá tham khảo là mức giá AI gợi ý dựa trên dữ liệu nội bộ và tình trạng sản phẩm. Mức giá này không bắt buộc."
+  },
+  {
+    "id": "product_price_compare",
+    "domain": "pricing",
+    "intent": "product_price_reasonable_check",
+    "priority": 2,
+    "patterns": [
+      "giá sản phẩm có hợp lý không",
+      "làm sao biết giá hợp lý",
+      "so sánh giá bán",
+      "kiểm tra giá bán"
+    ],
+    "negative_patterns": [
+      "giá tham khảo là gì"
+    ],
+    "answer": "Bạn có thể so sánh giá bán với khoảng giá AI gợi ý và các sản phẩm tương tự trên nền tảng."
+  },
+  {
+    "id": "product_usage_time",
+    "domain": "pricing",
+    "intent": "product_usage_time_price_effect",
+    "priority": 3,
+    "patterns": [
+      "thời gian sử dụng ảnh hưởng giá",
+      "dùng lâu có giảm giá trị không",
+      "tuổi thọ sản phẩm ảnh hưởng giá",
+      "đã dùng lâu thì giá thế nào"
+    ],
+    "negative_patterns": [
+      "bảo hành"
+    ],
+    "answer": "Có. Thời gian sử dụng càng lâu thì giá trị sản phẩm thường càng giảm."
+  },
+  {
+    "id": "product_warranty",
+    "domain": "product",
+    "intent": "product_warranty_info",
+    "priority": 2,
+    "patterns": [
+      "sản phẩm cũ có bảo hành không",
+      "còn bảo hành không",
+      "thông tin bảo hành",
+      "bảo hành sản phẩm cũ"
+    ],
+    "negative_patterns": [
+      "thời gian sử dụng ảnh hưởng giá"
+    ],
+    "answer": "Tùy từng sản phẩm. Người bán cần ghi rõ thông tin bảo hành nếu còn hiệu lực."
+  },
+  {
+    "id": "product_images_needed",
+    "domain": "listing",
+    "intent": "listing_images_recommended_count",
+    "priority": 3,
+    "patterns": [
+      "cần bao nhiêu hình ảnh",
+      "đăng bao nhiêu ảnh",
+      "số lượng ảnh tối thiểu",
+      "nên đăng mấy ảnh"
+    ],
+    "negative_patterns": [
+      "tiêu chuẩn hình ảnh"
+    ],
+    "answer": "Nên đăng nhiều hình ảnh rõ nét từ các góc khác nhau để tăng độ tin cậy và khả năng được duyệt."
+  },
+  {
+    "id": "product_video",
+    "domain": "listing",
+    "intent": "listing_video_optional",
+    "priority": 3,
+    "patterns": [
+      "có cần đăng video không",
+      "video sản phẩm có bắt buộc",
+      "đăng video sản phẩm",
+      "có thể đăng video không"
+    ],
+    "negative_patterns": [
+      "hình ảnh"
+    ],
+    "answer": "Video không bắt buộc nhưng giúp người mua đánh giá sản phẩm rõ hơn."
+  },
+  {
+    "id": "product_sold_status",
+    "domain": "listing",
+    "intent": "listing_sold_visibility",
+    "priority": 2,
+    "patterns": [
+      "sản phẩm đã bán có còn hiển thị không",
+      "đã bán có bị ẩn không",
+      "trạng thái đã bán hiển thị thế nào",
+      "đã bán có còn xem được không"
+    ],
+    "negative_patterns": [
+      "xóa bài đăng"
+    ],
+    "answer": "Sản phẩm đã bán sẽ được đánh dấu là đã bán và không còn hiển thị để mua."
+  },
+  {
+    "id": "product_missing_info",
+    "domain": "listing",
+    "intent": "listing_missing_info_effect",
+    "priority": 2,
+    "patterns": [
+      "thiếu thông tin sản phẩm thì sao",
+      "không đủ thông tin đăng bài",
+      "thiếu mô tả có bị chờ duyệt không",
+      "thiếu thông tin quan trọng"
+    ],
+    "negative_patterns": [
+      "từ chối"
+    ],
+    "answer": "Thiếu thông tin quan trọng có thể khiến bài đăng bị chờ duyệt hoặc yêu cầu bổ sung."
+  },
+  {
+    "id": "product_condition_wrong",
+    "domain": "dispute",
+    "intent": "product_condition_mismatch",
+    "priority": 2,
+    "patterns": [
+      "người bán ghi sai tình trạng",
+      "tình trạng sản phẩm không đúng",
+      "mô tả tình trạng sai",
+      "bị sai tình trạng sản phẩm"
+    ],
+    "negative_patterns": [
+      "ai xác định tình trạng"
+    ],
+    "answer": "Nếu phát hiện sai lệch, người mua có thể mở tranh chấp và hệ thống sẽ xem xét xử lý."
+  }
+]

@@ -1,6 +1,10 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\2GO_EXE_Project.API",
+    "\\2GO_EXE_Project.API\\Controllers",
+    "\\2GO_EXE_Project.Domain"
   ],
+  "SelectedNode": "\\2GO_EXE_Project.slnx",
   "PreviewInSolutionExplorer": false
 }

@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 2go-recommerce-api:latest
+    container_name: 2go-api
+    volumes:
+      - "E:/EXE/Secret/go-market-exe-project-firebase-adminsdk-fbsvc-a7fb7c969f.json:/app/configs/firebase-credentials.json:ro"
+    env_file:
+      - .env  
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - ConnectionStrings__PostgreSqlConnection=${ConnectionStrings__PostgreSqlConnection}
+      - JWT__Issuer=2GO_EXE
+      - JWT__Audience=2GO_EXE
+      - JWT__Secret=${JWT__Secret}
+      - Firebase__CredentialsPath=/app/configs/firebase-credentials.json
+      - Firebase__ProjectId=${Firebase__ProjectId}
+      - Email__Password=${Email__Password}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

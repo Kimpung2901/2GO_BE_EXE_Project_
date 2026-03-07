@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="2GO_EXE_Project.API/2GO_EXE_Project.API.csproj" />
+  <Project Path="2GO_EXE_Project.BAL/2GO_EXE_Project.BLL.csproj" />
+  <Project Path="2GO_EXE_Project.DAL/2GO_EXE_Project.DAL.csproj" />
+  <Project Path="2GO_EXE_Project.Domain/2GO_EXE_Project.Domain.csproj" />
+</Solution>
